@@ -1,0 +1,6 @@
+@IntelliLift_HostAddress = http://localhost:5173
+
+GET {{IntelliLift_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

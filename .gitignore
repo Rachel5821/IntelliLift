@@ -1,0 +1,35 @@
+# Build artifacts
+bin/
+obj/
+.vs/
+*.exe
+*.dll
+*.pdb
+*.cache
+*.log
+
+# User-specific files
+*.user
+*.suo
+*.vsp
+*.ncb
+*.VC.db
+*.VC.opendb
+
+# NuGet
+packages/
+*.nupkg
+project.lock.json
+
+# Rider / Resharper
+.idea/
+*.DotSettings.user
+
+# Debugging
+*.tlog
+*.lastbuildstate
+
+# Temporary files
+*.tmp
+*.bak
+*.swp
