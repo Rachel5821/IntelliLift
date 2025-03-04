@@ -1,8 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace DBEntities.Model
 {
@@ -12,7 +8,11 @@ namespace DBEntities.Model
         public int StartFloor { get; set; }
         public int DestinationFloor { get; set; }
 
-
-
+        public Direction GetDirection()
+        {
+            if (DestinationFloor > StartFloor) return Direction.Up;
+            if (DestinationFloor < StartFloor) return Direction.Down;
+            return Direction.Idle;
+        }
     }
 }

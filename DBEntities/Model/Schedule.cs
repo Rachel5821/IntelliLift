@@ -1,12 +1,32 @@
-﻿using System;
+﻿using DBEntities.Model;
+using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
-namespace DBEntities.Model
+
+namespace ElevatorSimulation
 {
-    internal class Schedule
+    public partial class Schedule
     {
+        public Elevator Elevator { get; set; }
+        public List<Stop>Stops { get; set; } = new List<Stop>();
+        public float TotalCost { get; set; }
+        public float CapacityPenaltyCost { get; set; }
+        public List<Request> ServedRequests { get; set; } = new List<Request>();
+
+        public void AddStop(Stop stop)
+        {
+            Stops.Add(stop);
+        }
+
+        public bool IsFeasible()
+        {
+            return true;
+        }
+
+        public float CalculateCost(float capacityPenalty)
+        {
+            return 1;
+        }
     }
 }

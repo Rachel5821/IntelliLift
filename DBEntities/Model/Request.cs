@@ -1,8 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace DBEntities.Model
 {
@@ -11,5 +8,22 @@ namespace DBEntities.Model
         public DateTime ReleaseTime { get; set; }
         public int StartFloor { get; set; }
         public int DestinationFloor { get; set; }
+
+     
+        public List<Call> Calls { get; set; } = new List<Call>();
+
+ 
+        public void AddCall(Call call)
+        {
+            Calls.Add(call);
+        }
+
+        public int CallCount => Calls.Count;
+
+  
+        public List<int> GetDestinationFloors()
+        {
+            return Calls.ConvertAll(call => call.DestinationFloor);
+        }
     }
 }
