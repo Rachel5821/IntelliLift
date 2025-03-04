@@ -6,7 +6,13 @@ using System.Threading.Tasks;
 
 namespace DBEntities.Model
 {
-    internal class Call
+    public partial class Call
     {
+        public DateTime ReleaseTime { get; set; }
+        public int StartFloor { get; set; }
+        public int DestinationFloor { get; set; }
+
+
+
     }
 }

@@ -6,7 +6,10 @@ using System.Threading.Tasks;
 
 namespace DBEntities.Model
 {
-    internal class Request
+    public partial class Request
     {
+        public DateTime ReleaseTime { get; set; }
+        public int StartFloor { get; set; }
+        public int DestinationFloor { get; set; }
     }
 }

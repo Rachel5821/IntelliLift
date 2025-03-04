@@ -6,7 +6,22 @@ using System.Threading.Tasks;
 
 namespace DBEntities.Model
 {
-    internal class Elevator
+    public enum Direction
     {
+        Up = 1,
+        Down = -1,
+        Idle = 0
+    }
+    public partial class Elevator
+    {
+        public int Id { get; set; }
+        public int Capacity { get; set; }
+        public int CurrentFloor { get; set; }
+        public Direction CurrentDirection { get; set; }
+        public List<Call> LoadedCalls { get; set; } = new List<Call>();
+
+        public HashSet<int> FeasibleFirstFloors { get; set; }
+        public HashSet<Direction> FeasibleDirections { get; set; }
+        public HashSet<int> DropCommitments { get; set; } = new HashSet<int>();
     }
 }
