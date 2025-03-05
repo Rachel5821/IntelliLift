@@ -18,10 +18,9 @@ namespace DBEntities.Model
         public int Capacity { get; set; }
         public int CurrentFloor { get; set; }
         public Direction CurrentDirection { get; set; }
+        // רשימת הקריאות הטעונות במעלית
         public List<Call> LoadedCalls { get; set; } = new List<Call>();
-
-        public HashSet<int> FeasibleFirstFloors { get; set; }
-        public HashSet<Direction> FeasibleDirections { get; set; }
+        public HashSet<Direction> FeasibleDirections { get; set; }//כיוונים אפשריים
         public HashSet<int> DropCommitments { get; set; } = new HashSet<int>();
     }
 }

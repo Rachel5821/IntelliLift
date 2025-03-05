@@ -30,8 +30,7 @@ namespace DBEntities.Model
 
         public float CalculateStopTime(float baseStopTime, float loadTime)
         {
-            int transferCount = Pickups.Count + Drops.Count;
-            return Math.Max(baseStopTime, loadTime * transferCount);
+            return 1;
         }
     }
 }
