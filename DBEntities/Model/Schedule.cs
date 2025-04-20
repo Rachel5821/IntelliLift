@@ -3,13 +3,13 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 
-
 namespace ElevatorSimulation
 {
     public partial class Schedule
     {
+        public int Id { get; set; } // מזהה ייחודי
         public Elevator Elevator { get; set; }
-        public List<Stop>Stops { get; set; } = new List<Stop>();
+        public List<Stop> Stops { get; set; } = new List<Stop>();
         public float TotalCost { get; set; }
         public float CapacityPenaltyCost { get; set; }
         public List<Request> ServedRequests { get; set; } = new List<Request>();
