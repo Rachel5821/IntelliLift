@@ -1,8 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
-using DBEntities.Model;
+using Model;
 
-namespace BLL
+
+namespace Project.Algorithm
 {
     public class Column
     {
