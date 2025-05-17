@@ -1,6 +1,6 @@
 ﻿using ILOG.Concert;
 using ILOG.CPLEX;
-using Model;
+using Project;
 using System;
 using System.Collections.Generic;
 

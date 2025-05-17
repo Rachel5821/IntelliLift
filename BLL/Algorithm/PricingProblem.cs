@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using Model;
+using Project;
 
 namespace Project.Algorithm
 {
@@ -9,13 +9,12 @@ namespace Project.Algorithm
     {
         private readonly ProblemInstance instance;
         private readonly int elevatorIndex;
-        private readonly double[] requestDuals; // pr עבור בקשות לא משויכות
-        private readonly double elevatorDual; // pe עבור המעלית
-        private readonly int maxSchedules; // k - מספר מקסימלי של לוחות זמנים
+        private readonly double[] requestDuals; 
+        private readonly double elevatorDual; 
+        private readonly int maxSchedules; 
         private readonly Elevator elevator;
         private readonly List<Request> unassignedRequests;
 
-        // תוספת: שדות לאחסון בקשות משויכות ואסורות
         private List<Request> assignedRequests = new List<Request>();
         private List<Request> forbiddenRequests = new List<Request>();
 

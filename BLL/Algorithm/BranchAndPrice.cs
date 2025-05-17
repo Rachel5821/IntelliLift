@@ -1,5 +1,5 @@
 ﻿using Microsoft.VisualBasic;
-using Model;
+using Project;
 
 namespace Project.Algorithm
 {
@@ -349,14 +349,14 @@ namespace Project.Algorithm
             foreach (var request in column.ServedRequests)
             {
                 // זמן נסיעה לקומת הבקשה
-                double travelToPickupTime = CalculateTravelTime(currentFloor, request.StartFloor);
+                double travelToPickupTime = Constant.CalculateTravelTime(currentFloor, request.StartFloor);
                 currentTime += travelToPickupTime;
 
                 // זמן עצירה ואיסוף
                 currentTime += Constant.StopTime;
 
                 // זמן נסיעה ליעד
-                double travelToDestTime = CalculateTravelTime(request.StartFloor, request.DestinationFloor);
+                double travelToDestTime = Constant.CalculateTravelTime(request.StartFloor, request.DestinationFloor);
                 currentTime += travelToDestTime;
 
                 // זמן עצירה והורדה
@@ -390,13 +390,7 @@ namespace Project.Algorithm
             return cost;
         }
 
-        private double CalculateTravelTime(int fromFloor, int toFloor)
-        {
-            int distance = Math.Abs(toFloor - fromFloor);
-            if (distance == 0) return 0;
-
-            return Constant.ElevatorStartupTime + distance * Constant.DrivePerFloorTime;
-        }
+      
 
         private bool IsReducedCostNegative(Solution subProblemSolution)
         {
@@ -448,7 +442,7 @@ namespace Project.Algorithm
                 int nextFloor = column.Floors[i];
 
                 // חישוב זמן הנסיעה
-                double travelTime = CalculateTravelTime(currentFloor, nextFloor);
+                double travelTime = Constant.CalculateTravelTime(currentFloor, nextFloor);
                 currentTime += travelTime;
 
                 // קביעת כיוון הנסיעה

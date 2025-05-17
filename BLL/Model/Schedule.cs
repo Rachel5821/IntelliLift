@@ -1,10 +1,9 @@
-﻿using Model;
+﻿using Project.Algorithm;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using BLL;
 
-namespace Model
+namespace Project
 {
     public partial class Schedule
     {
@@ -94,7 +93,7 @@ namespace Model
                 // חישוב זמן נסיעה
                 if (i > 0)
                 {
-                    float travelTime = (float)CalculateTravelTime(currentFloor, floor);
+                    float travelTime = (float)Constant.CalculateTravelTime(currentFloor, floor);
                     currentTime += travelTime;
                 }
 
@@ -137,7 +136,7 @@ namespace Model
                 // אם יש עצירה (איסוף או הורדה), הוסף זמן עצירה
                 if (stop.Pickups.Count > 0 || stop.Drops.Count > 0)
                 {
-                    currentTime += (float)Model.Constant.StopTime;
+                    currentTime += (float)Project.Constant.StopTime;
                 }
             }
 

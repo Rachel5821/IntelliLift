@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Model
+namespace Project
 {
     public static class Constant
     {
@@ -15,5 +15,12 @@ namespace Model
         public static double ElevatorStartupTime = 1.0;
         public static double DrivePerFloorTime = 1.5;  // Time to drive between adjacent floors (seconds)
         public static double CapacityPenalty = 100.0;  // Penalty for exceeding capacity
+
+        public static double CalculateTravelTime(int fromFloor, int toFloor)
+        {
+            int distance = Math.Abs(toFloor - fromFloor);
+            if (distance == 0) return 0;
+            return ElevatorStartupTime + distance * DrivePerFloorTime;
+        }
     }
 }

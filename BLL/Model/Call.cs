@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace Model
+namespace Project
 {
     public partial class Call
     {

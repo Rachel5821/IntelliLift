@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using Model;
+using Project;
 
 namespace Project.Algorithm
 {
@@ -94,7 +94,7 @@ namespace Project.Algorithm
             return waitCost + travelCost + capacityCost;
         }
 
-        private double CalculateTravelTime(int fromFloor, int toFloor)
+        internal double CalculateTravelTime(int fromFloor, int toFloor)
         {
             int distance = Math.Abs(toFloor - fromFloor);
             if (distance == 0) return 0;
