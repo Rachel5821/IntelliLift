@@ -88,7 +88,7 @@ ExactReplan solver = new ExactReplan(instance);
 Solution solution = solver.solve();
 
 // Extract optimal schedules
-var optimalSchedules = solution.GetSelectedSchedules();'''
+var optimalSchedules = solution.GetSelectedSchedules(); ```
 
 ### Research Background
 
