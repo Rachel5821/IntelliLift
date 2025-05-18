@@ -90,7 +90,7 @@ Solution solution = solver.solve();
 // Extract optimal schedules
 var optimalSchedules = solution.GetSelectedSchedules();
 
-## Research Background
+### Research Background
 
 This implementation is based on the research paper:
 **"An Exact Reoptimization Algorithm for the Scheduling of Elevator Groups"**
