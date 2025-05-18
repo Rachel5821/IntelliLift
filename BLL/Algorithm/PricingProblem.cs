@@ -9,27 +9,31 @@ namespace Project.Algorithm
     {
         private readonly ProblemInstance instance;
         private readonly int elevatorIndex;
-        private readonly double[] requestDuals; 
-        private readonly double elevatorDual; 
-        private readonly int maxSchedules; 
+        private readonly double[] requestDuals; // πρ for ρ ∈ Ru
+        private readonly double elevatorDual;   // πe for elevator e
+        private readonly int k; // max schedules to find with negative reduced cost
         private readonly Elevator elevator;
-        private readonly List<Request> unassignedRequests;
+        private readonly List<Request> unassignedRequests; // Ru
 
-        private List<Request> assignedRequests = new List<Request>();
-        private List<Request> forbiddenRequests = new List<Request>();
+        // התאמה למערכות IA: הפרדת assigned מ-unassigned
+        private List<Request> assignedRequests = new List<Request>(); // R(e) - חייבות להיות בכל schedule
+        private List<Request> forbiddenRequests = new List<Request>(); // אסורות עקב אילוצי branching
 
-        public PricingProblem(ProblemInstance instance, int elevatorIndex, double[] requestDuals, double elevatorDual, int maxSchedules)
+        public PricingProblem(ProblemInstance instance, int elevatorIndex, double[] requestDuals, double elevatorDual, int k)
         {
             this.instance = instance;
             this.elevatorIndex = elevatorIndex;
             this.requestDuals = requestDuals;
             this.elevatorDual = elevatorDual;
-            this.maxSchedules = maxSchedules;
+            this.k = k;
             elevator = instance.GetElevators()[elevatorIndex];
             unassignedRequests = instance.GetUnassignedRequests();
         }
 
-        // תוספת: פונקציות להגדרת בקשות משויכות ואסורות
+        /// <summary>
+        /// קביעת בקשות שחייבות להיות משורתות (ההחלטה כבר התקבלה)
+        /// במערכת IA: אלו בקשות שכבר נאמר לנוסעים שהמעלית הזו תגיע אליהם
+        /// </summary>
         public void SetAssignedRequests(List<Request> requests)
         {
             assignedRequests.Clear();
@@ -39,6 +43,9 @@ namespace Project.Algorithm
             }
         }
 
+        /// <summary>
+        /// קביעת בקשות אסורות (בגלל אילוצי branching במאמר)
+        /// </summary>
         public void SetForbiddenRequests(List<Request> requests)
         {
             forbiddenRequests.Clear();
@@ -47,510 +54,427 @@ namespace Project.Algorithm
                 forbiddenRequests.AddRange(requests);
             }
         }
-        private List<PricingNode> CreateRootNodes()
-        {
-            // סינון הבקשות המותרות לפי אילוצי branching
-            List<Request> allowedRequests = unassignedRequests
-                .Where(r => !forbiddenRequests.Contains(r))
-                .ToList();
 
-            // הוספת בקשות משויכות (תמיד צריך לכלול אותן)
-            foreach (var req in assignedRequests)
+        /// <summary>
+        /// Branch & Bound pricing algorithm as described in Section 3.1
+        /// Returns k schedules with negative reduced cost
+        /// משתמש ב-PricingNode הקיימת במקום BranchBoundNode
+        /// </summary>
+        public List<Schedule> GenerateSchedulesWithNegativeReducedCost()
+        {
+            // Initialize according to the paper
+            List<Schedule> M = new List<Schedule>(); // Result set M
+            PriorityQueue<PricingNode, double> Q = new PriorityQueue<PricingNode, double>(); // Queue Q for best-first traversal
+            double θ = -1.0e6; // Threshold θ (initially −1.0 × 10^6)
+
+            // Start by computing lower bounds on the reduced cost for each root node
+            List<PricingNode> rootNodes = CreateRootNodes();
+
+            foreach (var rootNode in rootNodes)
             {
-                if (!allowedRequests.Contains(req))
+                double lowerBound = CalculateLowerBound(rootNode);
+                if (lowerBound < θ)
                 {
-                    allowedRequests.Add(req);
+                    Q.Enqueue(rootNode, lowerBound);
                 }
             }
 
-            List<PricingNode> rootNodes = new List<PricingNode>();
-            List<int> possibleFloors = GetPossibleNextFloors(allowedRequests);
-
-            foreach (int floor in possibleFloors)
+            // Branch & Bound main loop - traverse the search forest in a best-first manner
+            while (Q.Count > 0)
             {
-                Schedule schedule = new Schedule(elevatorIndex);
-                Stop initialStop = new Stop
-                {
-                    Floor = floor,
-                    ArrivalTime = (float)((float)elevator.CurrentTime + CalculateTravelTime(elevator.CurrentFloor, floor)),
-                    Direction = DetermineInitialDirection(elevator.CurrentFloor, floor)
-                };
-                schedule.AddStop(initialStop);
+                // Select the node v from Q with the smallest lower bound
+                PricingNode v = Q.Dequeue();
 
+                // If v is feasible and has reduced cost less than threshold θ
+                if (v.IsLast())
+                {
+                    Schedule schedule = v.GetSchedule();
+                    double reducedCost = CalculateReducedCost(schedule);
+
+                    if (reducedCost < θ)
+                    {
+                        // The corresponding schedule is collected in the result set M
+                        M.Add(schedule);
+
+                        // If M has now k schedules, the search is stopped and M returned
+                        if (M.Count >= k)
+                        {
+                            return M;
+                        }
+
+                        // θ is set to the minimum reduced cost of a schedule in M
+                        θ = M.Min(s => CalculateReducedCost(s));
+                    }
+                    continue;
+                }
+
+                // Branch on v and collect all valid child nodes in the set N
+                List<PricingNode> N = v.Branch();
+
+                foreach (var u in N)
+                {
+                    double uLowerBound = CalculateLowerBound(u);
+                    // Each u ∈ N is added to Q provided that its lower bound is less than θ
+                    if (uLowerBound < θ)
+                    {
+                        Q.Enqueue(u, uLowerBound);
+                    }
+                }
+            }
+
+            return M;
+        }
+
+        /// <summary>
+        /// Create root nodes as described in the paper:
+        /// "There is a separate root node r for every floor f where the elevator can still stop at next"
+        /// כולל את ה-assigned requests כחובה
+        /// </summary>
+        private List<PricingNode> CreateRootNodes()
+        {
+            List<PricingNode> rootNodes = new List<PricingNode>();
+
+            // Fi(e) - set of floors that are admissible for the first stop in a schedule
+            HashSet<int> Fi = GetAdmissibleFloorsForFirstStop();
+
+            foreach (int f in Fi)
+            {
+                // Sr is the schedule corresponding to dropping all loaded calls of elevator e with first stop at floor f
+                // + serving all assigned requests
+                Schedule Sr = CreateScheduleWithFirstStopAtFloorAndAssignedRequests(f);
+
+                // Create PricingNode with assigned requests already served
                 PricingNode rootNode = new PricingNode(
-                    currentFloor: floor,
-                    currentTime: elevator.CurrentTime + CalculateTravelTime(elevator.CurrentFloor, floor),
-                    servedRequests: new HashSet<Request>(),
-                    unServedRequests: new List<Request>(allowedRequests),
-                    currentSchedule: schedule,
-                    currentLoad: elevator.LoadedCalls.Count
+                    currentFloor: Sr.Stops.LastOrDefault()?.Floor ?? f,
+                    currentTime: Sr.Stops.LastOrDefault()?.ArrivalTime ?? (float)elevator.CurrentTime,
+                    servedRequests: new HashSet<Request>(assignedRequests), // כבר כולל assigned requests
+                    unServedRequests: GetAllowedUnassignedRequests(), // רק unassigned requests שמותרות
+                    currentSchedule: Sr,
+                    currentLoad: CalculateLoadAfterSchedule(Sr)
                 );
+
                 rootNodes.Add(rootNode);
             }
 
             return rootNodes;
         }
 
-        // הוספת פונקציה לקביעת כיוון ראשוני
-        private Direction DetermineInitialDirection(int currentFloor, int nextFloor)
+        /// <summary>
+        /// Create schedule Sr as described: dropping all loaded calls with first stop at floor f
+        /// PLUS serving all assigned requests (במערכת IA - התחייבות!)
+        /// </summary>
+        private Schedule CreateScheduleWithFirstStopAtFloorAndAssignedRequests(int firstFloor)
         {
-            if (currentFloor < nextFloor) return Direction.Up;
-            if (currentFloor > nextFloor) return Direction.Down;
-            return elevator.CurrentDirection;
-        }
-        public List<Schedule> GenerateSchedulesWithNegativeReducedCost()
-        {
-            List<Schedule> resultSchedules = new List<Schedule>();
-            PriorityQueue<PricingNode, double> queue = new PriorityQueue<PricingNode, double>();
-            double threshold = -1.0e-6; // סף לסינון עלות מופחתת
-
-            // יצירת צמתי שורש
-            List<PricingNode> rootNodes = CreateRootNodes();
-
-            // הוספת צמתי השורש לתור העדיפות
-            foreach (var rootNode in rootNodes)
-            {
-                double lowerBound = CalculateLowerBound(rootNode);
-                if (lowerBound < threshold)
-                {
-                    queue.Enqueue(rootNode, lowerBound);
-                }
-            }
-
-            // מקרה מיוחד: המעלית חייבת לשרת בקשות מסוימות
-            if (queue.Count == 0 && assignedRequests.Count > 0)
-            {
-                // יצירת לוח זמנים שמשרת רק את הבקשות המשויכות
-                Schedule mandatorySchedule = CreateScheduleForMandatoryRequests();
-                if (mandatorySchedule != null)
-                {
-                    resultSchedules.Add(mandatorySchedule);
-                    return resultSchedules;
-                }
-            }
-
-            // Branch & Bound רגיל
-            while (queue.Count > 0 && resultSchedules.Count < maxSchedules)
-            {
-                PricingNode node = queue.Dequeue();
-
-                if (node.IsLast())
-                {
-                    Schedule schedule = node.GetSchedule();
-                    double reducedCost = CalculateReducedCost(schedule);
-
-                    if (reducedCost < threshold)
-                    {
-                        resultSchedules.Add(schedule);
-                        threshold = Math.Max(threshold, resultSchedules.Min(s => CalculateReducedCost(s)));
-                    }
-
-                    continue;
-                }
-
-                List<PricingNode> children = node.Branch();
-                foreach (var child in children)
-                {
-                    double lowerBound = CalculateLowerBound(child);
-                    if (lowerBound < threshold)
-                    {
-                        queue.Enqueue(child, lowerBound);
-                    }
-                }
-            }
-
-            // אם לא נמצאו לוחות זמנים, החזר לוח ריק
-            if (resultSchedules.Count == 0)
-            {
-                Schedule emptySchedule = new Schedule(elevatorIndex);
-                Stop initialStop = new Stop
-                {
-                    Floor = elevator.CurrentFloor,
-                    ArrivalTime = 0,
-                    Direction = elevator.CurrentDirection
-                };
-                emptySchedule.AddStop(initialStop);
-                resultSchedules.Add(emptySchedule);
-            }
-
-            return resultSchedules;
-        }
-
-        // פונקציה ליצירת לוח זמנים עבור בקשות שחייבים לשרת
-        private Schedule CreateScheduleForMandatoryRequests()
-        {
-            if (assignedRequests.Count == 0)
-                return null;
-
             Schedule schedule = new Schedule(elevatorIndex);
-            Stop initialStop = new Stop
+            float currentTime = (float)elevator.CurrentTime;
+            int currentFloor = elevator.CurrentFloor;
+
+            // Travel to first floor if needed
+            if (currentFloor != firstFloor)
             {
-                Floor = elevator.CurrentFloor,
-                ArrivalTime = 0,
-                Direction = elevator.CurrentDirection
+                double travelTime = CalculateTravelTime(currentFloor, firstFloor);
+                currentTime += (float)travelTime;
+            }
+
+            // First stop at floor f
+            Stop firstStop = new Stop
+            {
+                Floor = firstFloor,
+                ArrivalTime = currentTime,
+                Direction = GetFeasibleDirectionForFirstStop()
             };
-            schedule.AddStop(initialStop);
+            schedule.AddStop(firstStop);
 
-            // שירות כל בקשה בנפרד - פשוט אבל לא אופטימלי
-            foreach (var request in assignedRequests)
+            // Add stops for dropping all loaded calls
+            currentFloor = firstFloor;
+            foreach (var loadedCall in elevator.LoadedCalls)
             {
-                // עצירת איסוף
-                float pickupTime = initialStop.ArrivalTime + (float)CalculateTravelTime(elevator.CurrentFloor, request.StartFloor);
-                Stop pickupStop = new Stop
-                {
-                    Floor = request.StartFloor,
-                    ArrivalTime = pickupTime,
-                    Direction = request.StartFloor < request.DestinationFloor ? Direction.Up : Direction.Down
-                };
-                pickupStop.AddPickup(request);
-                schedule.AddStop(pickupStop);
+                double travelTime = CalculateTravelTime(currentFloor, loadedCall.DestinationFloor);
+                currentTime += (float)travelTime;
 
-                // עצירת הורדה
-                float dropTime = pickupTime + (float)CalculateTravelTime(request.StartFloor, request.DestinationFloor) + (float)instance.GetstopTime();
                 Stop dropStop = new Stop
                 {
-                    Floor = request.DestinationFloor,
-                    ArrivalTime = dropTime,
+                    Floor = loadedCall.DestinationFloor,
+                    ArrivalTime = currentTime,
                     Direction = Direction.Idle
                 };
-                foreach (var call in request.Calls)
+                dropStop.AddDrop(loadedCall);
+                schedule.AddStop(dropStop);
+
+                currentTime += (float)instance.stopTime;
+                currentFloor = loadedCall.DestinationFloor;
+            }
+
+            // ***הנקודה המרכזית***: הוספת כל ה-assigned requests כחובה
+            // במערכת IA אלו בקשות שכבר נאמר לנוסעים שהמעלית הזו תגיע
+            foreach (var assignedRequest in assignedRequests)
+            {
+                // נסיעה לקומת האיסוף
+                double travelTime = CalculateTravelTime(currentFloor, assignedRequest.StartFloor);
+                currentTime += (float)travelTime;
+
+                // עצירת איסוף
+                Stop pickupStop = new Stop
+                {
+                    Floor = assignedRequest.StartFloor,
+                    ArrivalTime = currentTime,
+                    Direction = DetermineDirection(assignedRequest.StartFloor, assignedRequest.DestinationFloor)
+                };
+                pickupStop.AddPickup(assignedRequest);
+                schedule.AddStop(pickupStop);
+
+                currentTime += (float)instance.stopTime;
+                currentFloor = assignedRequest.StartFloor;
+
+                // עצירת הורדה
+                travelTime = CalculateTravelTime(currentFloor, assignedRequest.DestinationFloor);
+                currentTime += (float)travelTime;
+
+                Stop dropStop = new Stop
+                {
+                    Floor = assignedRequest.DestinationFloor,
+                    ArrivalTime = currentTime,
+                    Direction = Direction.Idle
+                };
+
+                foreach (var call in assignedRequest.Calls)
                 {
                     dropStop.AddDrop(call);
                 }
                 schedule.AddStop(dropStop);
 
-                schedule.ServedRequests.Add(request);
+                currentTime += (float)instance.stopTime;
+                currentFloor = assignedRequest.DestinationFloor;
+
+                schedule.ServedRequests.Add(assignedRequest);
             }
 
-            // חישוב עלות ועלות מופחתת
-            double totalCost = 0; // צריך לחשב את העלות האמיתית
-            foreach (var stop in schedule.Stops)
-            {
-                foreach (var pickup in stop.Pickups)
-                {
-                    foreach (var call in pickup.Calls)
-                    {
-                        double waitTime = stop.ArrivalTime - (float)call.ReleaseTime.ToOADate();
-                        totalCost += call.WaitCost * Math.Max(0, waitTime);
-                    }
-                }
-            }
-            schedule.TotalCost = (float)totalCost;
-
+            schedule.TotalCost = (float)CalculateTotalScheduleCost(schedule);
             return schedule;
         }
 
-
-
-        private bool IsFeasible(PricingNode node)
+        /// <summary>
+        /// Lower bound calculation as described in Section 3.2:
+        /// "consists of two parts: a lower bound on the reduced cost of requests already picked up 
+        /// and a lower bound on the additional reduced cost for serving still unserved requests"
+        /// מותאם ל-PricingNode הקיימת
+        /// </summary>
+        private double CalculateLowerBound(PricingNode v)
         {
-            // צומת היא סופית אם:
-            // 1. אין בקשות משויכות שלא נאספו
-            // 2. אין הורדות ממתינות
-            // 3. כל הבקשות המשויכות נכללות
+            // Part 1: "The reduced cost for the picked up requests are at least c̃(Sv)"
+            double servedCost = v.CurrentSchedule.TotalCost;
+            double servedDualSum = 0;
 
-            bool allAssignedIncluded = true;
-            foreach (var request in assignedRequests)
-            {
-                if (!node.ServedRequests.Contains(request))
-                {
-                    allAssignedIncluded = false;
-                    break;
-                }
-            }
-
-            return allAssignedIncluded &&
-                   node.ServedRequests.Count == unassignedRequests.Count &&
-                   node.currentLoad == 0;
-        }
-
-        private double CalculateReducedCost(Schedule schedule)
-        {
-            double cost = schedule.TotalCost;
-            double dualSum = 0;
-
-            // חישוב ∑r∈Ru\S pr
-            foreach (var request in schedule.ServedRequests)
+            foreach (var request in v.ServedRequests)
             {
                 int requestIndex = unassignedRequests.IndexOf(request);
                 if (requestIndex >= 0 && requestIndex < requestDuals.Length)
-                {
-                    dualSum += requestDuals[requestIndex];
-                }
-            }
-
-            // c̃(S) = c(S) - ∑r∈Ru\S pr - pe
-            return cost - dualSum - elevatorDual;
-        }
-
-
-        private Direction DetermineDirection(int fromFloor, int toFloor)
-        {
-            if (fromFloor < toFloor) return Direction.Up;
-            if (fromFloor > toFloor) return Direction.Down;
-            return Direction.Idle;
-        }
-
-        private double CalculateEarliestPickupTime(PricingNode node, Request request)
-        {
-            int startFloor = request.StartFloor;
-            int currentFloor = node.CurrentFloor;
-            double currentTime = node.currentTime;
-
-            // חישוב זמן נסיעה ישיר
-            double travelTime = CalculateTravelTime(currentFloor, startFloor);
-            double directPickupTime = currentTime + travelTime;
-
-            // במערכת IA, יש לשמור על כיוון הנסיעה הנוכחי
-            Direction currentDirection = node.CurrentSchedule.Stops.Last().Direction;
-            Direction requestDirection = startFloor < request.DestinationFloor ? Direction.Up : Direction.Down;
-
-            // אם יש נוסעים במעלית והכיוון הפוך, צריך קודם להוריד אותם
-            if (node.currentLoad > 0 && currentDirection != Direction.Idle && currentDirection != requestDirection)
-            {
-                // חישוב זמן להוריד את כל הנוסעים הנוכחיים
-                double dropTime = CalculateTimeToDropCurrentPassengers(node);
-                return Math.Max(directPickupTime, dropTime);
-            }
-
-            return directPickupTime;
-        }
-
-        private double CalculateTimeToDropCurrentPassengers(PricingNode node)
-        {
-            // בפשטות, נניח שכל הנוסעים הנוכחיים מורדים בקומה הבאה
-            double currentTime = node.currentTime;
-            double travelTime = CalculateTravelTime(node.CurrentFloor, node.CurrentFloor + (int)node.CurrentSchedule.Stops.Last().Direction);
-            return currentTime + travelTime + instance.stopTime;
-        }
-
-        private double CalculateEarliestDropTime(PricingNode node, Request request, double pickupTime)
-        {
-            int startFloor = request.StartFloor;
-            int destFloor = request.DestinationFloor;
-
-            // זמן הנסיעה מקומת האיסוף לקומת היעד
-            double travelTime = CalculateTravelTime(startFloor, destFloor);
-
-            // זמן עצירה לאיסוף + זמן נסיעה + זמן עצירה להורדה
-            return pickupTime + instance.stopTime + travelTime + instance.stopTime;
-        }
-
-        // פונקציית עזר לבדיקה אם השגיאה היא בגלל חישוב לא נכון
-        public void DiagnoseAndPrintLowerBounds()
-        {
-            Console.WriteLine("=== אבחון חסמים תחתונים ===");
-
-            // סינון הבקשות המותרות
-            List<Request> allowedRequests = unassignedRequests
-                .Where(r => !forbiddenRequests.Contains(r))
-                .ToList();
-
-            // יצירת צמתי שורש
-            List<PricingNode> rootNodes = CreateRootNodes();
-
-            foreach (var node in rootNodes)
-            {
-                Console.WriteLine($"צומת שורש בקומה {node.CurrentFloor}:");
-
-                // חישוב חסם תחתון
-                double lowerBound = CalculateLowerBound(node);
-                Console.WriteLine($"  חסם תחתון: {lowerBound}");
-
-                // בדיקה ספציפית לכל בקשה
-                foreach (var request in node.UnServedRequests)
-                {
-                    // הדפסת פרטי הבקשה
-                    Console.WriteLine($"  בקשה {request.Id} (מ-{request.StartFloor} ל-{request.DestinationFloor}):");
-
-                    // חישוב זמני איסוף והורדה
-                    double pickupTime = CalculateEarliestPickupTime(node, request);
-                    double dropTime = CalculateEarliestDropTime(node, request, pickupTime);
-
-                    Console.WriteLine($"    זמן איסוף מוקדם ביותר: {pickupTime}");
-                    Console.WriteLine($"    זמן הורדה מוקדם ביותר: {dropTime}");
-
-                    // חישוב עלויות
-                    double waitCost = 0;
-                    double travelCost = 0;
-
-                    foreach (var call in request.Calls)
-                    {
-                        double callWaitTime = Math.Max(0, pickupTime - call.ReleaseTime.ToOADate());
-                        double callTravelTime = dropTime - pickupTime;
-
-                        waitCost += call.WaitCost * callWaitTime;
-                        travelCost += call.TravelCost * callTravelTime;
-
-                        Console.WriteLine($"    קריאה: זמן המתנה = {callWaitTime}, זמן נסיעה = {callTravelTime}");
-                        Console.WriteLine($"    עלויות: המתנה = {waitCost}, נסיעה = {travelCost}");
-                    }
-
-                    // חישוב עלות קיבולת
-                    double capacityCost = CalculateCapacityPenalty(node, request);
-                    Console.WriteLine($"    עלות קיבולת: {capacityCost}");
-
-                    // חישוב עלות כוללת וערך דואלי
-                    double totalCost = waitCost + travelCost + capacityCost;
-                    int requestIndex = unassignedRequests.IndexOf(request);
-                    double requestDual = requestIndex >= 0 && requestIndex < requestDuals.Length ?
-                        requestDuals[requestIndex] : 0;
-
-                    Console.WriteLine($"    עלות כוללת: {totalCost}, ערך דואלי: {requestDual}");
-                    Console.WriteLine($"    עלות מופחתת: {totalCost - requestDual}");
-                }
-            }
-        }
-
-        private double CalculateTimeAfterOppositeDirectionDrops(PricingNode node, Direction requestDirection)
-        {
-            float currentTime = 0;
-
-            // לקיחת הזמן מהעצירה האחרונה בלוח
-            if (node.CurrentSchedule.Stops.Count > 0)
-            {
-                currentTime = node.CurrentSchedule.Stops.Last().ArrivalTime;
-            }
-
-            int currentFloor = node.CurrentFloor;
-
-            // רשימת קומות עם הורדות בכיוון ההפוך
-            List<int> oppositeDropFloors = new List<int>();
-
-            foreach (var stop in node.CurrentSchedule.Stops)
-            {
-                foreach (int dropFloor in stop.DropFloors)
-                {
-                    Direction dropDirection = DetermineDirection(currentFloor, dropFloor);
-
-                    if (dropDirection != requestDirection && dropDirection != Direction.Idle)
-                    {
-                        oppositeDropFloors.Add(dropFloor);
-                    }
-                }
-            }
-
-            // אם אין הורדות בכיוון ההפוך, מחזירים את הזמן הנוכחי
-            if (oppositeDropFloors.Count == 0)
-            {
-                return currentTime;
-            }
-
-            // מיון הקומות לפי סדר העצירה בהתאם לכיוון ההפוך לבקשה
-            oppositeDropFloors.Sort((a, b) =>
-                requestDirection == Direction.Up ? b.CompareTo(a) : a.CompareTo(b));
-
-            // חישוב הזמן לאחר ביצוע כל ההורדות
-            double totalTime = currentTime;
-            int lastFloor = currentFloor;
-
-            foreach (int floor in oppositeDropFloors)
-            {
-                // זמן נסיעה לקומה
-                totalTime += CalculateTravelTime(lastFloor, floor);
-
-                // זמן עצירה
-                totalTime += Constant.StopTime;
-
-                lastFloor = floor;
-            }
-
-            return totalTime;
-        }
-
-
-
-        private double CalculateCapacityPenalty(PricingNode node, Request request)
-        {
-            int cabinCapacity = elevator.Capacity;
-            int currentLoad = node.currentLoad;
-            int requestCalls = request.Calls.Count;
-
-            // במערכת IA, בקשה מתווספת לעומס הנוכחי
-            if (currentLoad + requestCalls > cabinCapacity)
-            {
-                return instance.capacityPenalty * (currentLoad + requestCalls - cabinCapacity);
-            }
-
-            return 0;
-        }
-        private double CalculateLowerBound(PricingNode node)
-        {
-            // חלק 1: החסם התחתון לעלות המופחתת של הבקשות שכבר נאספו
-            double servedCost = node.CurrentSchedule.TotalCost;
-            double servedDualSum = 0;
-
-            foreach (var request in node.ServedRequests)
-            {
-                int requestIndex = unassignedRequests.IndexOf(request);
-                if (requestIndex >= 0)
                 {
                     servedDualSum += requestDuals[requestIndex];
                 }
             }
 
-            // חלק 2: הערכת עלויות נוספות לבקשות שטרם שויכו
+            // Part 2: Lower bound for additional reduced cost
             double additionalCost = 0;
 
-            foreach (var request in node.UnServedRequests)
+            foreach (var ρ in v.UnServedRequests)
             {
-                // חישוב הזמן המוקדם ביותר לאיסוף ולהורדה
-                double pickupTime = CalculateEarliestPickupTime(node, request);
-                double dropTime = CalculateEarliestDropTime(node, request, pickupTime);
+                // Calculate t+(ρ) - earliest pickup time as described in the paper
+                double tPlus = CalculateEarliestPickupTime(v, ρ);
 
-                // חישוב עלויות המתנה ונסיעה
                 double requestCost = 0;
-                foreach (var call in request.Calls)
+                foreach (var c in ρ.Calls)
                 {
-                    double waitTime = Math.Max(0, pickupTime - call.ReleaseTime.ToOADate());
-                    double travelTime = dropTime - pickupTime;
+                    // Calculate t-(c) - earliest drop time
+                    double tMinus = CalculateEarliestDropTime(v, ρ, c, tPlus);
 
-                    requestCost += call.WaitCost * waitTime + call.TravelCost * travelTime;
+                    // Cost calculation as per the paper formula
+                    double waitTime = Math.Max(0, tPlus - c.ReleaseTime.ToOADate());
+                    double travelTime = tMinus - tPlus;
+
+                    requestCost += c.WaitCost * waitTime + c.TravelCost * travelTime;
                 }
 
-                // חישוב עלויות חריגה מקיבולת
-                requestCost += CalculateCapacityPenalty(node, request);
+                // Add capacity penalty cost
+                requestCost += CalculateCapacityPenalty(v, ρ);
 
-                // אם העלות גדולה מהערך הדואלי, אין טעם להוסיף את הבקשה
-                int requestIndex = unassignedRequests.IndexOf(request);
-                double requestDual = requestIndex >= 0 ? requestDuals[requestIndex] : 0;
+                // Dual fixing as described: "If πρ ≤ c̄(ρ) it will never be favorable to serve this request"
+                int requestIndex = unassignedRequests.IndexOf(ρ);
+                double πρ = requestIndex >= 0 && requestIndex < requestDuals.Length ? requestDuals[requestIndex] : 0;
 
-                if (requestDual <= requestCost)
+                if (πρ > requestCost)
                 {
-                    // אין טעם להוסיף את הבקשה כי תמיד תגדיל את העלות המופחתת
-                    continue;
+                    // Optional request is worth including
+                    additionalCost += requestCost - πρ;
                 }
-
-                additionalCost += requestCost - requestDual;
             }
 
-            // החסם התחתון הסופי
+            // Return total lower bound
             return servedCost - servedDualSum + additionalCost - elevatorDual;
         }
 
-        private double EstimateRequestCost(Request request, int currentFloor, double currentTime)
+        /// <summary>
+        /// Calculate t+(ρ) as described in the paper
+        /// מותאם ל-PricingNode הקיימת
+        /// </summary>
+        private double CalculateEarliestPickupTime(PricingNode v, Request ρ)
         {
-            // הערכת עלות מינימלית לבקשה (מבוסס על t+(r) ו-t-(c) מסעיף 3.2)
-            double travelToPickup = CalculateTravelTime(currentFloor, request.StartFloor);
-            double pickupTime = currentTime + travelToPickup + Constant.StopTime;
+            int fPlus = ρ.StartFloor;
 
-            double cost = 0;
-            foreach (var call in request.Calls)
+            // השתמש במידע מה-PricingNode
+            int currentFloor = v.CurrentFloor;
+            double currentTime = v.currentTime;
+
+            // Check if direction of ρ is opposite to current direction
+            Direction ρDirection = DetermineDirection(ρ.StartFloor, ρ.DestinationFloor);
+            Direction currentDirection = v.CurrentSchedule.Stops.LastOrDefault()?.Direction ?? Direction.Idle;
+
+            if (currentDirection != Direction.Idle && currentDirection != ρDirection)
             {
-                double waitTime = Math.Max(0, pickupTime - call.ReleaseTime.ToOADate());
-                double travelToDest = CalculateTravelTime(request.StartFloor, request.DestinationFloor);
-                double dropTime = pickupTime + travelToDest + Constant.StopTime;
+                // "the elevator has to visit all drop floors before it can pickup ρ"
+                return CalculateTimeAfterAllDropFloors(v) + CalculateTravelTime(GetLastDropFloor(v), fPlus);
+            }
+            else
+            {
+                // Direct travel to pickup floor
+                return currentTime + CalculateTravelTime(currentFloor, fPlus);
+            }
+        }
 
-                cost += call.WaitCost * waitTime + call.TravelCost * travelToDest;
+        /// <summary>
+        /// Calculate t-(c) as described in the paper
+        /// מותאם ל-PricingNode הקיימת
+        /// </summary>
+        private double CalculateEarliestDropTime(PricingNode v, Request ρ, Call c, double tPlus)
+        {
+            // Following the paper: "let f1, ..., fℓ be the sequence of ℓ floors to be visited before dropping c"
+            List<int> floorsSequence = GetFloorsSequenceBeforeDropping(v, ρ, c);
+
+            double time = tPlus + Math.Max(instance.stopTime, ρ.Calls.Count * instance.stopTime);
+
+            // Add travel times between floors
+            for (int i = 0; i < floorsSequence.Count - 1; i++)
+            {
+                time += CalculateTravelTime(floorsSequence[i], floorsSequence[i + 1]);
+                if (i < floorsSequence.Count - 2) // Not the last stop
+                {
+                    time += instance.stopTime;
+                }
             }
 
-            // עלות קיבולת
-            if (elevator.LoadedCalls.Count + request.Calls.Count > elevator.Capacity)
+            return time;
+        }
+
+        /// <summary>
+        /// Calculate capacity penalty as described in the paper
+        /// מותאם ל-PricingNode הקיימת
+        /// </summary>
+        private double CalculateCapacityPenalty(PricingNode v, Request ρ)
+        {
+            int currentLoad = v.currentLoad;
+            int requestLoad = ρ.Calls.Count;
+
+            if (currentLoad + requestLoad > elevator.Capacity)
             {
-                cost += Constant.CapacityPenalty * (elevator.LoadedCalls.Count + request.Calls.Count - elevator.Capacity);
+                return instance.capacityPenalty * (currentLoad + requestLoad - elevator.Capacity);
             }
 
-            return cost;
+            return 0;
+        }
+
+        /// <summary>
+        /// Calculate reduced cost as defined in the paper: c̃(S) := c(S) - ∑ρ∈Ru∩S πρ - πe
+        /// שים לב: רק unassigned requests נכנסות לחישוב הdual sum!
+        /// assigned requests לא נכנסות כי הן לא ב-Ru (הן כבר "לא אפשריות לשינוי")
+        /// </summary>
+        private double CalculateReducedCost(Schedule schedule)
+        {
+            double cost = schedule.TotalCost;
+            double dualSum = 0;
+
+            // ***נקודה קריטית***: רק unassigned requests נכנסות לחישוב!
+            // assigned requests לא חלק מ-Ru במאמר
+            foreach (var request in schedule.ServedRequests)
+            {
+                // רק אם זה לא assigned request
+                if (!assignedRequests.Contains(request))
+                {
+                    int requestIndex = unassignedRequests.IndexOf(request);
+                    if (requestIndex >= 0 && requestIndex < requestDuals.Length)
+                    {
+                        dualSum += requestDuals[requestIndex];
+                    }
+                }
+            }
+
+            return cost - dualSum - elevatorDual;
+        }
+
+        #region Helper Methods - Implementation Details
+
+        /// <summary>
+        /// מחזיר רק unassigned requests שמותרות (לא forbidden)
+        /// </summary>
+        private List<Request> GetAllowedUnassignedRequests()
+        {
+            return unassignedRequests
+                .Where(r => !forbiddenRequests.Contains(r) && !assignedRequests.Contains(r))
+                .ToList();
+        }
+
+        /// <summary>
+        /// חישוב load אחרי ביצוע schedule
+        /// </summary>
+        private int CalculateLoadAfterSchedule(Schedule schedule)
+        {
+            int load = elevator.LoadedCalls.Count;
+
+            foreach (var stop in schedule.Stops)
+            {
+                load += stop.Pickups.Sum(r => r.Calls.Count);
+                load -= stop.Drops.Count;
+            }
+
+            return Math.Max(0, load);
+        }
+
+        private HashSet<int> GetAdmissibleFloorsForFirstStop()
+        {
+            HashSet<int> floors = new HashSet<int> { elevator.CurrentFloor };
+
+            foreach (var call in elevator.LoadedCalls)
+            {
+                floors.Add(call.DestinationFloor);
+            }
+
+            return floors;
+        }
+
+        private Direction GetFeasibleDirectionForFirstStop()
+        {
+            return elevator.CurrentDirection;
+        }
+
+        private double CalculateTimeAfterAllDropFloors(PricingNode v)
+        {
+            // פשוט - במימוש מלא צריך לחשב דרך כל ה-drop floors
+            var lastStop = v.CurrentSchedule.Stops.LastOrDefault();
+            if (lastStop?.DropFloors.Count > 0)
+            {
+                return lastStop.ArrivalTime + lastStop.DropFloors.Count * instance.stopTime;
+            }
+            return v.currentTime;
+        }
+
+        private int GetLastDropFloor(PricingNode v)
+        {
+            var lastStop = v.CurrentSchedule.Stops.LastOrDefault();
+            return lastStop?.DropFloors.LastOrDefault() ?? v.CurrentFloor;
+        }
+
+        private List<int> GetFloorsSequenceBeforeDropping(PricingNode v, Request ρ, Call c)
+        {
+            return new List<int> { ρ.StartFloor, c.DestinationFloor };
         }
 
         private double CalculateTravelTime(int fromFloor, int toFloor)
@@ -559,55 +483,40 @@ namespace Project.Algorithm
             if (distance == 0) return 0;
             return Constant.ElevatorStartupTime + distance * Constant.DrivePerFloorTime;
         }
-        private double CalculateTotalCost(Schedule schedule)
+
+        private Direction DetermineDirection(int fromFloor, int toFloor)
+        {
+            if (fromFloor < toFloor) return Direction.Up;
+            if (fromFloor > toFloor) return Direction.Down;
+            return Direction.Idle;
+        }
+
+        private double CalculateTotalScheduleCost(Schedule schedule)
         {
             double totalCost = 0;
 
-            // עלויות המתנה ונסיעה
             foreach (var stop in schedule.Stops)
             {
-                // חישוב עלויות המתנה
+                // Wait costs
                 foreach (var request in stop.Pickups)
                 {
                     foreach (var call in request.Calls)
                     {
-                        double waitTime = Math.Max(0, stop.ArrivalTime - (float)call.ReleaseTime.ToOADate());
+                        double waitTime = Math.Max(0, stop.ArrivalTime - call.ReleaseTime.ToOADate());
                         totalCost += call.WaitCost * waitTime;
                     }
                 }
 
-                // חישוב עלויות נסיעה
+                // Travel costs
                 foreach (var call in stop.Drops)
                 {
-                    // מציאת זמן האיסוף של הקריאה
-                    double pickupTime = 0;
-                    foreach (var prevStop in schedule.Stops)
-                    {
-                        if (prevStop == stop) break;
-
-                        foreach (var request in prevStop.Pickups)
-                        {
-                            if (request.Calls.Contains(call))
-                            {
-                                pickupTime = prevStop.ArrivalTime;
-                                break;
-                            }
-                        }
-
-                        if (pickupTime > 0) break;
-                    }
-
+                    double pickupTime = FindPickupTimeForCall(schedule, call);
                     double travelTime = stop.ArrivalTime - pickupTime;
                     totalCost += call.TravelCost * travelTime;
                 }
-            }
 
-            // עלויות קיבולת
-            for (int i = 0; i < schedule.Stops.Count; i++)
-            {
-                Stop stop = schedule.Stops[i];
-                int load = stop.Current.Count;
-
+                // Capacity penalty
+                int load = CalculateLoadAtStop(schedule, stop);
                 if (load > elevator.Capacity)
                 {
                     totalCost += instance.capacityPenalty * (load - elevator.Capacity);
@@ -616,32 +525,69 @@ namespace Project.Algorithm
 
             return totalCost;
         }
-        private List<int> GetPossibleNextFloors(List<Request> allowedRequests)
+
+        private double FindPickupTimeForCall(Schedule schedule, Call call)
         {
-            HashSet<int> floors = new HashSet<int>();
-
-            // קומות התחלה של בקשות
-            foreach (var request in allowedRequests)
+            foreach (var stop in schedule.Stops)
             {
-                floors.Add(request.StartFloor);
+                foreach (var request in stop.Pickups)
+                {
+                    if (request.Calls.Contains(call))
+                    {
+                        return stop.ArrivalTime;
+                    }
+                }
             }
-
-            // קומות ייעד של בקשות (עבור הורדות)
-            foreach (var request in allowedRequests)
-            {
-                floors.Add(request.DestinationFloor);
-            }
-
-            // קומות הורדה של קריאות שכבר בתוך המעלית
-            foreach (var call in elevator.LoadedCalls)
-            {
-                floors.Add(call.DestinationFloor);
-            }
-
-            // מיון הקומות לפי מרחק מהקומה הנוכחית
-            return floors.OrderBy(f => Math.Abs(f - elevator.CurrentFloor)).ToList();
+            return 0;
         }
 
+        private int CalculateLoadAtStop(Schedule schedule, Stop targetStop)
+        {
+            int load = elevator.LoadedCalls.Count;
 
+            foreach (var stop in schedule.Stops)
+            {
+                if (stop == targetStop) break;
+                load += stop.Pickups.Sum(r => r.Calls.Count);
+                load -= stop.Drops.Count;
+            }
+
+            return Math.Max(0, load);
+        }
+
+        /// <summary>
+        /// פונקציית עזר לאבחון (ניתן להסיר בפרודקשן)
+        /// </summary>
+        public void DiagnoseSystem()
+        {
+            Console.WriteLine("=== אבחון Branch & Bound למערכת IA ===");
+            Console.WriteLine($"מעלית: {elevatorIndex}");
+            Console.WriteLine($"Assigned requests (חובה): {assignedRequests.Count}");
+            Console.WriteLine($"Unassigned requests (B&B): {GetAllowedUnassignedRequests().Count}");
+            Console.WriteLine($"Forbidden requests: {forbiddenRequests.Count}");
+            Console.WriteLine($"Max schedules: {k}");
+            Console.WriteLine($"Elevator dual (πe): {elevatorDual}");
+
+            if (assignedRequests.Count > 0)
+            {
+                Console.WriteLine("Assigned requests (יופיעו בכל schedule):");
+                foreach (var req in assignedRequests)
+                {
+                    Console.WriteLine($"  בקשה {req.Id}: {req.StartFloor} → {req.DestinationFloor}");
+                }
+            }
+
+            if (requestDuals != null && requestDuals.Length > 0)
+            {
+                Console.WriteLine("Request duals (πρ) - רק לunassigned:");
+                var allowedRequests = GetAllowedUnassignedRequests();
+                for (int i = 0; i < Math.Min(requestDuals.Length, allowedRequests.Count); i++)
+                {
+                    Console.WriteLine($"  בקשה {allowedRequests[i].Id}: πρ = {requestDuals[i]}");
+                }
+            }
+        }
+
+        #endregion
     }
 }
