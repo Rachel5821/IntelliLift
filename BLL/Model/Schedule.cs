@@ -99,7 +99,7 @@ namespace Project
 
                 // יצירת עצירה
                 Direction direction = Direction.Idle;
-                if (i < column.Floors.Count - 1)
+                if (i < column.Floors.Count - 1)    
                 {
                     int nextFloor = column.Floors[i + 1];
                     direction = nextFloor > floor ? Direction.Up : (nextFloor < floor ? Direction.Down : Direction.Idle);

@@ -23,5 +23,7 @@ namespace Project
         public HashSet<Direction> FeasibleDirections { get; set; }//כיוונים אפשריים
         public HashSet<int> DropCommitments { get; set; } = new HashSet<int>();
         public float CurrentTime { get; set; }
+        public List<Request> AssignedRequests { get; set; } = new List<Request>(); // R(e) במאמר
+
     }
 }

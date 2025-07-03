@@ -27,7 +27,6 @@ namespace Project.Algorithm
         private IObjective objective;
         private List<INumVar> scheduleVars; //משתנים עבור כל לוח זמנים
 
-        //אילוצים
         private IRange[] requestConstraints;
         private IRange[] elevatorConstraints;
         private List<IRange> branchingConstraints;
@@ -54,7 +53,6 @@ namespace Project.Algorithm
             constraintInfoMap = new Dictionary<IRange, BranchingConstraintInfo>();
             schedules = new ScheduleCollection(other.schedules);
 
-            // העתקת כל column מהמודל המקורי
             foreach (var schedule in other.schedules.GetAllSchedules())
             {
                 AddSchedule(schedule, schedule.ElevatorIndex);
@@ -76,14 +74,13 @@ namespace Project.Algorithm
             try
             {
                 objective = cplex.AddMinimize();
-                //אילוץ לבקשות
-                var unassignedRequests = instance.GetUnassignedRequests();
+                List<Request> unassignedRequests = instance.GetUnassignedRequests();
                 requestConstraints = new IRange[unassignedRequests.Count];
                 for (int i = 0; i < unassignedRequests.Count; i++)
                 {
                     requestConstraints[i] = cplex.AddRange(1.0, 1.0);
                 }
-                //אילוץ למעליות
+
                 elevatorConstraints = new IRange[instance.numElevators];
                 for (int i = 0; i < instance.numElevators; i++)
                 {
@@ -98,16 +95,16 @@ namespace Project.Algorithm
             }
         }
 
-        // שינוי במחלקת MasterModel בפונקציה AddSchedule
-
         public void AddSchedule(Schedule schedule, int elevatorIndex)
         {
             try
             {
                 schedules.Add(schedule);
                 ILOG.Concert.Column column = cplex.Column(objective, schedule.TotalCost);
-                column = column.And(cplex.Column(elevatorConstraints[elevatorIndex], 1.0));
+                column = column.And(cplex.Column(elevatorConstraints[elevatorIndex], 1.0));//שייך למעלית מסוימת ושם לה 1
                 var unassignedRequests = instance.GetUnassignedRequests();
+                //מוסיפים לבקשות ע"י אלו לוחות זמנים הם משורתות
+                //לדוג:בקשה1: x₀ + x₂ + x₅ = 1.0   (לוחות שמשרתים בקשה1)
                 for (int i = 0; i < unassignedRequests.Count; i++)
                 {
                     var request = unassignedRequests[i];
@@ -199,7 +196,6 @@ namespace Project.Algorithm
                     var constraint = branchingConstraints[branchingConstraints.Count - 1];
                     cplex.Remove(constraint);
 
-                    // הסרת המידע מהמפה
                     if (constraintInfoMap.ContainsKey(constraint))
                     {
                         constraintInfoMap.Remove(constraint);

@@ -1,0 +1,53 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<ClassDiagram MajorVersion="1" MinorVersion="1">
+  <Class Name="Project.Elevator">
+    <Position X="2.75" Y="0.75" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>AAAOAAAAAAAAAAACAAAABAACAAAgIAAAAAAAgAAAAAA=</HashCode>
+      <FileName>Model\Elevator.cs</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="Project.Call">
+    <Position X="4.5" Y="0.75" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>AAAAAAAAAAAAAEAAAAASAAAAAAAAAACAAAAAAAAAAAA=</HashCode>
+      <FileName>Model\Call.cs</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="Project.Constant">
+    <Position X="6.5" Y="0.75" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>AAIAAAAAAAAAAAAAAAgAAAAIAAAAQAAAAAAAAICQAEA=</HashCode>
+      <FileName>Model\Constant.cs</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="Project.Request">
+    <Position X="8.5" Y="1.25" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>AAAiAAAQAAAAAEAAAAASAAgAAAAAAQAAAAAAAAAAAAA=</HashCode>
+      <FileName>Model\Request.cs</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="Project.Schedule">
+    <Position X="4.5" Y="2.75" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>AAADCAAAAAAAAAABAAAEECAAAAAgAAAAAAABgAAAACA=</HashCode>
+      <FileName>Model\Schedule.cs</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="Project.Stop">
+    <Position X="6.5" Y="3.75" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>AAQAAAAAAAgAAAkAACCAMAAAAAAAAEIAAAAAAAAAAAA=</HashCode>
+      <FileName>Model\Stop.cs</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Enum Name="Project.Direction">
+    <Position X="2.75" Y="3.75" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>AAAAAAJAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAI=</HashCode>
+      <FileName>Model\Elevator.cs</FileName>
+    </TypeIdentifier>
+  </Enum>
+  <Font Name="Segoe UI" Size="9" />
+</ClassDiagram>

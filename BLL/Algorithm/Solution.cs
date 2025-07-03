@@ -9,10 +9,10 @@ namespace Project.Algorithm
 {
     public class Solution
     {
-        private double[] values;//ערך המשתנים בפתרון
+        private double[] values;
 
         private ScheduleCollection schedules;
-        public double ObjectiveValue { get; private set; }
+        public double ObjectiveValue { get; private set; }//ערך פונקציית המטרה
         private double[] requestDuals;
         private double[] elevatorDuals;
         public bool isIntegral { get; private set; }
@@ -24,18 +24,15 @@ namespace Project.Algorithm
             if (schedules == null)
                 throw new ArgumentNullException(nameof(schedules));
 
-            // העתקה עמוקה של המערכים
             this.values = (double[])values.Clone();
             this.schedules = schedules; // בהנחה שהרשימה לא תשתנה מחוץ למחלקה
             ObjectiveValue = objectiveValue;
 
-            // העתקת הערכים הדואליים רק אם הם קיימים
             if (requestDuals != null)
                 this.requestDuals = (double[])requestDuals.Clone();
             if (elevatorDuals != null)
                 this.elevatorDuals = (double[])elevatorDuals.Clone();
 
-            // בדיקה אם הפתרון שלם
             isIntegral = true;
             foreach (var value in this.values)
             {

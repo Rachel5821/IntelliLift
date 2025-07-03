@@ -230,10 +230,13 @@ namespace Project.Algorithm
 
                 foreach (var request in problemInstance.GetUnassignedRequests())
                 {
+                    // יצירת מסלול הגיוני מהתחלה
+                    List<int> logicalRoute = CreateOptimalRouteSimple(elevator, new List<Request> { request });
+
                     Column column = new Column
                     {
                         ServedRequests = new List<Request> { request },
-                        Floors = new List<int> { elevator.CurrentFloor, request.StartFloor, request.DestinationFloor },
+                        Floors = logicalRoute,  // ← עכשיו הגיוני מהתחלה
                         AssignedElevator = elevator
                     };
 
@@ -258,12 +261,13 @@ namespace Project.Algorithm
                     {
                         for (int j = i + 1; j < requests.Count; j++)
                         {
+                            // יצירת מסלול הגיוני לשתי בקשות
+                            List<int> logicalRoute = CreateOptimalRouteSimple(elevator, new List<Request> { requests[i], requests[j] });
+
                             Column column = new Column
                             {
                                 ServedRequests = new List<Request> { requests[i], requests[j] },
-                                Floors = new List<int> { elevator.CurrentFloor, requests[i].StartFloor,
-                                       requests[i].DestinationFloor, requests[j].StartFloor,
-                                       requests[j].DestinationFloor },
+                                Floors = logicalRoute,  // ← עכשיו הגיוני מהתחלה
                                 AssignedElevator = elevator
                             };
 
@@ -318,10 +322,13 @@ namespace Project.Algorithm
                 // ליצור עמודה עבור כל בקשה בודדת
                 foreach (var request in problemInstance.GetUnassignedRequests())
                 {
+                    // יצירת מסלול הגיוני מהתחלה
+                    List<int> logicalRoute = CreateOptimalRouteSimple(elevator, new List<Request> { request });
+
                     Column singleRequestColumn = new Column
                     {
                         ServedRequests = new List<Request> { request },
-                        Floors = new List<int> { elevator.CurrentFloor, request.StartFloor, request.DestinationFloor },
+                        Floors = logicalRoute,  // ← עכשיו הגיוני מהתחלה
                         AssignedElevator = elevator
                     };
 
@@ -423,7 +430,96 @@ namespace Project.Algorithm
 
             return column;
         }
+        private List<int> CreateOptimalRouteSimple(Elevator elevator, List<Request> requests)
+        {
+            if (requests.Count == 0)
+                return new List<int> { elevator.CurrentFloor };
 
+            List<int> route = new List<int> { elevator.CurrentFloor };
+
+            if (elevator.LoadedCalls != null && elevator.LoadedCalls.Count > 0)
+            {
+                var existingDropFloors = elevator.LoadedCalls
+                    .Select(call => call.DestinationFloor)
+                    .Where(floor => floor != elevator.CurrentFloor)
+                    .Distinct()
+                    .OrderBy(floor => Math.Abs(floor - elevator.CurrentFloor));
+
+                foreach (var floor in existingDropFloors)
+                {
+                    if (!route.Contains(floor))
+                        route.Add(floor);
+                }
+            }
+
+            var sortedRequests = requests.OrderBy(r =>
+            {
+                if (elevator.CurrentDirection == Direction.Up && r.StartFloor >= elevator.CurrentFloor)
+                    return Math.Abs(r.StartFloor - elevator.CurrentFloor);
+                else if (elevator.CurrentDirection == Direction.Down && r.StartFloor <= elevator.CurrentFloor)
+                    return Math.Abs(r.StartFloor - elevator.CurrentFloor);
+                else
+                    return 1000 + Math.Abs(r.StartFloor - elevator.CurrentFloor);
+            }).ToList();
+
+            foreach (var request in sortedRequests)
+            {
+                if (!route.Contains(request.StartFloor))
+                {
+                    int bestPickupIndex = FindBestInsertionIndex(route, request.StartFloor);
+                    route.Insert(bestPickupIndex, request.StartFloor);
+                }
+
+                if (!route.Contains(request.DestinationFloor))
+                {
+                    int pickupIndex = route.IndexOf(request.StartFloor);
+                    int bestDropIndex = FindBestInsertionIndex(route, request.DestinationFloor, pickupIndex + 1);
+                    route.Insert(bestDropIndex, request.DestinationFloor);
+                }
+            }
+
+            return route;
+        }
+
+        private int FindBestInsertionIndex(List<int> route, int newFloor, int minIndex = 1)
+        {
+            if (route.Count <= minIndex)
+                return route.Count;
+
+            double minCost = double.MaxValue;
+            int bestIndex = route.Count;
+
+            for (int i = minIndex; i <= route.Count; i++)
+            {
+                double cost = CalculateInsertionCost(route, newFloor, i);
+                if (cost < minCost)
+                {
+                    minCost = cost;
+                    bestIndex = i;
+                }
+            }
+
+            return bestIndex;
+        }
+
+        private double CalculateInsertionCost(List<int> route, int newFloor, int insertIndex)
+        {
+            if (insertIndex == 0 || insertIndex > route.Count)
+                return double.MaxValue;
+
+            if (insertIndex == route.Count)
+            {
+                return Math.Abs(newFloor - route[route.Count - 1]);
+            }
+
+            int prevFloor = route[insertIndex - 1];
+            int nextFloor = route[insertIndex];
+
+            double originalCost = Math.Abs(nextFloor - prevFloor);
+            double newCost = Math.Abs(newFloor - prevFloor) + Math.Abs(nextFloor - newFloor);
+
+            return newCost - originalCost;
+        }
         private Schedule ConvertScheduleFromColumn(Column column)
         {
             if (column == null || column.AssignedElevator == null)
@@ -452,7 +548,6 @@ namespace Project.Algorithm
                     direction = nextFloor < column.Floors[i + 1] ? Direction.Up : Direction.Down;
                 }
 
-                // יצירת העצירה
                 Stop stop = new Stop
                 {
                     Floor = nextFloor,
@@ -460,7 +555,23 @@ namespace Project.Algorithm
                     Direction = direction
                 };
 
-                schedule.AddStop(stop);
+                // ✅ הוסף את זה! - בדוק איזה בקשות נאספות/נורדות בקומה הזו
+                foreach (var request in column.ServedRequests)
+                {
+                    if (request.StartFloor == nextFloor)
+                    {
+                        stop.AddPickup(request);  // איסוף!
+                    }
+                    if (request.DestinationFloor == nextFloor)
+                    {
+                        foreach (var call in request.Calls)
+                        {
+                            stop.AddDrop(call);  // הורדה!
+                        }
+                    }
+                }
+
+                schedule.AddStop(stop);  // ← עכשיו העצירה מלאה!
 
                 // עדכון הקומה הנוכחית
                 currentFloor = nextFloor;
@@ -650,4 +761,5 @@ namespace Project.Algorithm
             }
         }
     }
+
 }
