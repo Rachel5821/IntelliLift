@@ -71,7 +71,7 @@
                 else
                 {
                     // צור מעליות ברירת מחדל
-                    for (int i = 1; i <= numElevators; i++)
+                    for (int i = 0; i <= numElevators; i++)
                     {
                         var elevator = new Elevator
                         {
@@ -104,8 +104,7 @@
                             StartFloor = requestData.StartFloor,   // <<<< תיקון: StartFloor
                             DestinationFloor = requestData.DestinationFloor, // <<<< תיקון: DestinationFloor
                             WaitCost = 1.0,
-                            TravelCost = 1.0
-                        });
+                            TravelCost = 15.0                        });
 
                         instance.AddRequest(req);
                     }
@@ -164,64 +163,86 @@
                 return assignments;
             }
 
-            private List<object> ExtractRoutes(Solution solution, ProblemInstance instance, int numElevators)
+        private List<object> ExtractRoutes(Solution solution, ProblemInstance instance, int numElevators)
+        {
+            var routes = new List<object>();
+
+            // ✅ לוג לבדיקה
+            Console.WriteLine("=== DEBUG ExtractRoutes ===");
+
+            if (solution == null)
             {
-                var routes = new List<object>();
-
-                // צור רוט לכל מעלית
-                for (int elevatorId = 1; elevatorId <= numElevators; elevatorId++)
+                Console.WriteLine("Solution is null!");
+                // צור routes ריקים למעליות
+                for (int i = 0; i < numElevators; i++)
                 {
-                    object elevatorRoute; // הגדרה כ-object כללי
-
-                    // מצא את הלוח הזמנים של המעלית הזו
-                    if (solution != null)
+                    routes.Add(new
                     {
-                        var schedules = solution.GetSelectedSchedules();
-                        var elevatorSchedule = schedules.FirstOrDefault(s => s.ElevatorIndex == elevatorId - 1);
-
-                        if (elevatorSchedule != null && elevatorSchedule.Stops != null)
-                        {
-                            // בנה את האובייקט עם הנתונים האמיתיים
-                            elevatorRoute = new
-                            {
-                                elevatorId = elevatorId,
-                                stops = elevatorSchedule.Stops.Select(stop => new
-                                {
-                                    floor = stop.Floor,
-                                    arrivalTime = stop.ArrivalTime,
-                                    direction = stop.Direction.ToString(),
-                                    pickups = stop.Pickups.Select(r => r.Id).ToList(),
-                                    dropsCount = stop.Drops.Count
-                                }).ToList()
-                            };
-                        }
-                        else
-                        {
-                            // מעלית ללא לוח זמנים
-                            elevatorRoute = new
-                            {
-                                elevatorId = elevatorId,
-                                stops = new List<object>()
-                            };
-                        }
-                    }
-                    else
-                    {
-                        // אין פתרון
-                        elevatorRoute = new
-                        {
-                            elevatorId = elevatorId,
-                            stops = new List<object>()
-                        };
-                    }
-
-                    routes.Add(elevatorRoute);
+                        elevatorId = i,
+                        stops = new List<object>()
+                    });
                 }
-
                 return routes;
             }
 
-            private object ExtractStatus(Solution solution, ProblemInstance instance, int numElevators)
+            var schedules = solution.GetSelectedSchedules();
+            Console.WriteLine($"מספר לוחות זמנים: {schedules?.Count ?? 0}");
+
+            // צור route לכל מעלית
+            for (int elevatorIndex = 0; elevatorIndex < numElevators; elevatorIndex++)
+            {
+                Console.WriteLine($"מחפש לוח זמנים למעלית {elevatorIndex}");
+
+                // מצא את הלוח הזמנים של המעלית הזו
+                var elevatorSchedule = schedules?.FirstOrDefault(s => s.ElevatorIndex == elevatorIndex);
+
+                if (elevatorSchedule != null)
+                {
+                    Console.WriteLine($"נמצא לוח זמנים למעלית {elevatorIndex} עם {elevatorSchedule.Stops?.Count ?? 0} עצירות");
+
+                    if (elevatorSchedule.Stops != null && elevatorSchedule.Stops.Count > 0)
+                    {
+                        var stops = elevatorSchedule.Stops.Select(stop => new
+                        {
+                            floor = stop.Floor,
+                            arrivalTime = stop.ArrivalTime,
+                            direction = stop.Direction.ToString(),
+                            pickups = stop.Pickups?.Select(r => r.Id).ToList() ?? new List<int>(),
+                            dropsCount = stop.Drops?.Count ?? 0
+                        }).ToList();
+
+                        routes.Add(new
+                        {
+                            elevatorId = elevatorIndex , // 1-based for output
+                            stops = stops
+                        });
+                    }
+                    else
+                    {
+                        // מעלית עם לוח זמנים אבל ללא עצירות
+                        routes.Add(new
+                        {
+                            elevatorId = elevatorIndex ,
+                            stops = new List<object>()
+                        });
+                    }
+                }
+                else
+                {
+                    Console.WriteLine($"לא נמצא לוח זמנים למעלית {elevatorIndex}");
+                    // מעלית ללא לוח זמנים
+                    routes.Add(new
+                    {
+                        elevatorId = elevatorIndex ,
+                        stops = new List<object>()
+                    });
+                }
+            }
+
+            Console.WriteLine($"סה\"כ routes שנוצרו: {routes.Count}");
+            return routes;
+        }
+        private object ExtractStatus(Solution solution, ProblemInstance instance, int numElevators)
             {
                 var totalRequests = instance.GetUnassignedRequests().Count;
                 var assignedRequests = 0;

@@ -87,7 +87,7 @@ namespace ElevatorSchedulingTest
                 stopTime: 2.0,        // 2 שניות עצירה
                 loadTime: 1.0,        // 1 שנייה טעינה
                 drivePerFloorTime: 1.5, // 1.5 שניות נסיעה בין קומות
-                capacityPenalty: 100.0); // קנס על עומס יתר
+                capacityPenalty: 1000.0); // קנס על עומס יתר
 
             // מערך מעליות בפריסה אסטרטגית
             var elevatorSetup = new[]

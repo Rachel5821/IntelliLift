@@ -48,6 +48,9 @@ namespace Project.Algorithm
         {
             return schedules.Count == 0;
         }
-
+        public int RemoveAll(Predicate<Schedule> match)
+        {
+            return schedules.RemoveAll(match);
+        }
     }
 }

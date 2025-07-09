@@ -16,11 +16,12 @@ namespace Project.Algorithm
         public double stopTime { get; set; }
         private double loadTime { get; set; }
         private double drivePerFloorTime { get; set; }
-        public double capacityPenalty { get; set; }
+        public double capacityPenalty { get; set; } = 1000;
+        //public double capacityPenalty { get; set; }
         private List<Elevator> elevators { get; set; } = new List<Elevator>();
         private List<Request> unassignedRequests { get; set; } = new List<Request>();
         public ProblemInstance(int numElevators, int numFloors, double stopTime, double loadTime,
-                          double drivePerFloorTime, double capacityPenalty)
+                          double drivePerFloorTime, double capacityPenalty = 1000)
         {
             this.numElevators = numElevators;
             this.numFloors = numFloors;
@@ -71,6 +72,6 @@ namespace Project.Algorithm
             }
             throw new IndexOutOfRangeException($"Index {index} is out of range for unassigned requests");
         }
-        
+
     }
 }

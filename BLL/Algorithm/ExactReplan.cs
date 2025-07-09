@@ -402,13 +402,35 @@ namespace Project.Algorithm
                     bestSolution = lpSolution;
                     bestObjectiveValue = lpSolution.ObjectiveValue;
                 }
+                Console.WriteLine($"איטרציה {iterations}: האם הפתרון שלם? {lpSolution.isIntegral}");
 
                 // בדיקה אם יש פתרון שלם
-                if (lpSolution.isIntegral)
+                if (lpSolution.isIntegral /*&& iterations >= 2*/)
                 {
                     Console.WriteLine($"מצאנו פתרון שלם במודל המוגבל, ערך: {lpSolution.ObjectiveValue}");
+
+                    var selectedSchedules = lpSolution.GetSelectedSchedules();
+                    Console.WriteLine($"מספר לוחות זמנים נבחרו: {selectedSchedules.Count}");
+
+                    foreach (var schedule in selectedSchedules)
+                    {
+                        Console.WriteLine($"לוח זמנים למעלית {schedule.ElevatorIndex}: {schedule.Stops?.Count ?? 0} עצירות, {schedule.ServedRequests?.Count ?? 0} בקשות");
+                        Console.WriteLine($"  TotalCost: {schedule.TotalCost}"); // ✅ הוסף את זה
+
+                        // ✅ הוסף את זה - הדפס את העצירות אם יש
+                        if (schedule.Stops != null && schedule.Stops.Count > 0)
+                        {
+                            foreach (var stop in schedule.Stops)
+                            {
+                                Console.WriteLine($"    עצירה בקומה {stop.Floor} בזמן {stop.ArrivalTime}");
+                            }
+                        }
+                    }
+
                     return lpSolution;
                 }
+                columnsAdded = GenerateNewColumns(model, lpSolution);
+
 
                 // חיפוש והוספת עמודות חדשות
                 columnsAdded = GenerateNewColumns(model, lpSolution);
@@ -434,6 +456,7 @@ namespace Project.Algorithm
 
         private bool GenerateNewColumns(MasterModel model, Solution lpSolution)
         {
+            Console.WriteLine("נכנס לcolumngeneration");
             bool columnsAdded = false;
 
             // נסיון שימוש בלוחות זמנים ישנים אם האופציה מאופשרת
@@ -498,7 +521,7 @@ namespace Project.Algorithm
         }
 
         // הוספת שיטה לחישוב Reduced Cost
-        private double CalculateReducedCost(Schedule schedule, double[] requestDuals, double[] elevatorDuals)
+        public double CalculateReducedCost(Schedule schedule, double[] requestDuals, double[] elevatorDuals)
         {
             if (schedule == null)
             {

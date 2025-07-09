@@ -103,7 +103,7 @@ class ElevatorTimingAnalyzer
             StartFloor = 2,
             DestinationFloor = 7,
             WaitCost = 1.0,
-            TravelCost = 1.0
+            TravelCost = 1000.0
         };
         request1.AddCall(call1);
 

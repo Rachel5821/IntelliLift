@@ -8,7 +8,7 @@ namespace Project
     public partial class Schedule
     {
         public int Id { get; set; }
-        public int ElevatorIndex { get;  set; }
+        public int ElevatorIndex { get; set; }
         // public Elevator Elevator { get; set; }
         public List<Stop> Stops { get; set; } = new List<Stop>();
         public float TotalCost { get; set; }
@@ -22,7 +22,7 @@ namespace Project
             Stops = new List<Stop>();
             ServedRequests = new List<Request>();
         }
-        
+
 
         // Copy constructor - creates a deep copy
         public Schedule(Schedule source)
@@ -99,7 +99,7 @@ namespace Project
 
                 // יצירת עצירה
                 Direction direction = Direction.Idle;
-                if (i < column.Floors.Count - 1)    
+                if (i < column.Floors.Count - 1)
                 {
                     int nextFloor = column.Floors[i + 1];
                     direction = nextFloor > floor ? Direction.Up : (nextFloor < floor ? Direction.Down : Direction.Idle);

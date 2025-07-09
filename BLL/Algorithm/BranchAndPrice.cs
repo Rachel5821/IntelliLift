@@ -397,7 +397,7 @@ namespace Project.Algorithm
             return cost;
         }
 
-      
+
 
         private bool IsReducedCostNegative(Solution subProblemSolution)
         {

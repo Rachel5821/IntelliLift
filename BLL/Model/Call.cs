@@ -9,7 +9,7 @@ namespace Project
         public int DestinationFloor { get; set; }
 
         public double WaitCost { get; set; } = 1.0;  // מקדם עלות להמתנה
-        public double TravelCost { get; set; } = 1.0; //מקדם עלות לזמן נסיעה
+        public double TravelCost { get; set; } = 15.0; //מקדם עלות לזמן נסיעה//??
 
         //public Direction GetDirection()
         //{
