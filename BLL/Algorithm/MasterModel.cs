@@ -16,7 +16,7 @@ namespace Project.Algorithm
         public BranchingConstraintInfo(int requestIndex, List<int> elevatorGroup, bool isAssigned)
         {
             RequestIndex = requestIndex;
-            ElevatorGroup = new List<int>(elevatorGroup); // העתקה עמוקה
+            ElevatorGroup = new List<int>(elevatorGroup);
             IsAssigned = isAssigned;
         }
     }
@@ -26,13 +26,13 @@ namespace Project.Algorithm
         private Cplex cplex;
         private ProblemInstance instance;
         private IObjective objective;
-        private List<INumVar> scheduleVars; //משתנים עבור כל לוח זמנים
+        private List<INumVar> scheduleVars;
 
         private IRange[] requestConstraints;
         private IRange[] elevatorConstraints;
         private IRange[] elevatorLoadConstraints;
         private List<IRange> branchingConstraints;
-        private Dictionary<IRange, BranchingConstraintInfo> constraintInfoMap; // מיפוי בין אילוצים למידע שלהם
+        private Dictionary<IRange, BranchingConstraintInfo> constraintInfoMap;
         private ScheduleCollection schedules;
 
         public MasterModel(ProblemInstance problemInstance)
@@ -60,8 +60,6 @@ namespace Project.Algorithm
                 AddSchedule(schedule, schedule.ElevatorIndex);
             }
 
-            // העתקת אילוצי branching
-            // שים לב: זו העתקה פשטנית שעשויה לא לעבוד מושלם
             foreach (var constraint in other.branchingConstraints)
             {
                 if (other.constraintInfoMap.TryGetValue(constraint, out var info))
@@ -90,8 +88,7 @@ namespace Project.Algorithm
                 }
 
                 elevatorLoadConstraints = new IRange[instance.numElevators];
-                // int maxRequestsPerElevator = Math.Max(3, instance.GetUnassignedRequests().Count / instance.numElevators + 1);
-                int maxRequestsPerElevator = instance.GetUnassignedRequests().Count; // ללא הגבלה
+                int maxRequestsPerElevator = instance.GetUnassignedRequests().Count;
 
                 for (int e = 0; e < instance.numElevators; e++)
                 {
@@ -101,7 +98,6 @@ namespace Project.Algorithm
             }
             catch (ILOG.Concert.Exception ex)
             {
-                Console.WriteLine("Error initializing master model: " + ex.Message);
                 throw;
             }
         }
@@ -114,22 +110,17 @@ namespace Project.Algorithm
             }
             if (schedule.TotalCost >= 470)
             {
-                Console.WriteLine($"🚫 לוח זמנים יקר (עלות {schedule.TotalCost}) - מחליף ב-fallback");
-
-                // קבל את המעלית והבקשות מה-instance
                 var elevators = instance.GetElevators();
                 if (elevatorIndex < elevators.Count)
                 {
                     Elevator elevator = elevators[elevatorIndex];
                     List<Request> allRequests = instance.GetUnassignedRequests();
 
-                    // חלוקה חכמה של בקשות לפי כיוון ומרחק
                     List<Request> myRequests = SelectBestRequestsForElevator(elevator, allRequests, elevatorIndex);
 
                     if (myRequests.Count == 0)
                     {
-                        Console.WriteLine($"❌ אין בקשות מתאימות למעלית {elevatorIndex}");
-                        return; // אל תוסיף לוח ריק יקר
+                        return;
                     }
 
                     var route = CreateOptimalRouteSimple(elevator, myRequests);
@@ -137,18 +128,15 @@ namespace Project.Algorithm
 
                     if (fallbackSchedule != null)
                     {
-                        schedule = fallbackSchedule; // החלף בכל מקרה!
-                        Console.WriteLine($"✅ החלפתי בלוח fallback עם עלות {schedule.TotalCost} (היה {470})");
+                        schedule = fallbackSchedule;
                     }
                     else
                     {
-                        Console.WriteLine($"❌ Fallback נכשל, משתמש בלוח המקורי");
-                        return; // אל תוסיף לוח גרוע
+                        return;
                     }
                 }
             }
 
-            Console.WriteLine($"🔍 מוסיף לוח זמנים למעלית {elevatorIndex} עם עלות {schedule.TotalCost}, עצירות: {schedule.Stops?.Count ?? 0}");
             try
             {
                 schedules.Add(schedule);
@@ -157,7 +145,6 @@ namespace Project.Algorithm
 
                 var unassignedRequests = instance.GetUnassignedRequests();
 
-                // אילוצי בקשות
                 for (int i = 0; i < unassignedRequests.Count; i++)
                 {
                     var request = unassignedRequests[i];
@@ -167,7 +154,6 @@ namespace Project.Algorithm
                     }
                 }
 
-                // אילוצי ברנצ'ינג
                 foreach (var branchingConstraint in branchingConstraints)
                 {
                     if (constraintInfoMap.TryGetValue(branchingConstraint, out var constraintInfo))
@@ -193,20 +179,17 @@ namespace Project.Algorithm
                     }
                 }
 
-                // *** הוספת אילוץ עומס המעלית לפני יצירת המשתנה ***
                 int numRequestsInSchedule = schedule.ServedRequests.Count;
                 if (numRequestsInSchedule > 0)
                 {
                     column = column.And(cplex.Column(elevatorLoadConstraints[elevatorIndex], numRequestsInSchedule));
                 }
 
-                // יצירת המשתנה עם כל האילוצים
                 INumVar var = cplex.NumVar(column, 0, 1, NumVarType.Float);
                 scheduleVars.Add(var);
             }
             catch (ILOG.Concert.Exception ex)
             {
-                Console.WriteLine("Error adding schedule: " + ex.Message);
                 throw;
             }
         }
@@ -290,22 +273,18 @@ namespace Project.Algorithm
         {
             if (allRequests.Count == 0) return new List<Request>();
 
-            // אם זו הפעם הראשונה בסיבוב הזה - חשב הקצאות לכל המעליות
             if (!assignmentsCalculated)
             {
                 CalculateOptimalAssignments(allRequests);
                 assignmentsCalculated = true;
             }
 
-            // החזר את הבקשות שהוקצו למעלית הזו
             if (assignmentsForCurrentBatch.ContainsKey(elevatorIndex))
             {
                 var myRequests = assignmentsForCurrentBatch[elevatorIndex];
-                Console.WriteLine($"📊 מעלית {elevatorIndex}: קיבלה {myRequests.Count} בקשות");
                 return myRequests;
             }
 
-            Console.WriteLine($"📊 מעלית {elevatorIndex}: לא קיבלה בקשות");
             return new List<Request>();
         }
 
@@ -315,17 +294,13 @@ namespace Project.Algorithm
 
             var elevators = instance.GetElevators();
             int numElevators = elevators.Count;
-            int requestsPerElevator = 2; // כל מעלית רוצה 2 בקשות
+            int requestsPerElevator = 2;
 
-            Console.WriteLine($"🎯 מחשב הקצאה אופטימלית עבור {allRequests.Count} בקשות ו-{numElevators} מעליות");
-
-            // אתחל רשימות ריקות לכל מעלית
             for (int i = 0; i < numElevators; i++)
             {
                 assignmentsForCurrentBatch[i] = new List<Request>();
             }
 
-            // שלב 1: כל מעלית מדרגת את כל הבקשות
             var elevatorPreferences = new List<(int elevatorIndex, List<(Request request, double score)> rankedRequests)>();
 
             for (int i = 0; i < numElevators; i++)
@@ -336,18 +311,13 @@ namespace Project.Algorithm
                         request: request,
                         score: CalculateRequestScore(elevator, request, i, numElevators)
                     ))
-                    .OrderBy(x => x.score) // ציון נמוך = טוב יותר
+                    .OrderBy(x => x.score)
                     .ToList();
 
                 elevatorPreferences.Add((i, rankedRequests));
-
-                Console.WriteLine($"🎯 מעלית {i}: דירגה בקשות לפי העדפה");
             }
 
             var takenRequests = new HashSet<int>();
-
-            // שלב 2: תחילה, תן לכל מעלית בקשות שרק היא רוצה (ללא התנגשות)
-            Console.WriteLine("🔄 שלב 1: מחלק בקשות ללא התנגשות");
 
             foreach (var (elevatorIndex, rankedRequests) in elevatorPreferences)
             {
@@ -356,23 +326,18 @@ namespace Project.Algorithm
                     if (assignmentsForCurrentBatch[elevatorIndex].Count >= requestsPerElevator) break;
                     if (takenRequests.Contains(request.Id)) continue;
 
-                    // בדוק אם מעלית אחרת גם רוצה את הבקשה הזו
                     bool wantedByOthers = elevatorPreferences
                         .Where(other => other.elevatorIndex != elevatorIndex)
-                        .Any(other => other.rankedRequests.Take(requestsPerElevator * 2) // רק הטובות ביותר
+                        .Any(other => other.rankedRequests.Take(requestsPerElevator * 2)
                                       .Any(choice => choice.request.Id == request.Id));
 
                     if (!wantedByOthers)
                     {
                         assignmentsForCurrentBatch[elevatorIndex].Add(request);
                         takenRequests.Add(request.Id);
-                        Console.WriteLine($"✅ מעלית {elevatorIndex}: לקחה בקשה {request.Id} (ללא התנגשות, ציון: {score:F1})");
                     }
                 }
             }
-
-            // שלב 3: עכשיו פתור התנגשויות לפי עדיפות אינדקס
-            Console.WriteLine("🔄 שלב 2: פותר התנגשויות לפי עדיפות אינדקס");
 
             for (int priority = 0; priority < numElevators; priority++)
             {
@@ -385,98 +350,26 @@ namespace Project.Algorithm
 
                     assignmentsForCurrentBatch[elevatorIndex].Add(request);
                     takenRequests.Add(request.Id);
-                    Console.WriteLine($"🏆 מעלית {elevatorIndex}: לקחה בקשה {request.Id} (עדיפות אינדקס, ציון: {score:F1})");
-                }
-            }
-
-            // סיכום
-            Console.WriteLine("📋 סיכום הקצאות:");
-            for (int i = 0; i < numElevators; i++)
-            {
-                var requests = assignmentsForCurrentBatch[i];
-                if (requests.Count > 0)
-                {
-                    var requestIds = string.Join(", ", requests.Select(r => r.Id));
-                    Console.WriteLine($"   מעלית {i}: {requests.Count} בקשות [{requestIds}]");
-                }
-                else
-                {
-                    Console.WriteLine($"   מעלית {i}: אין בקשות");
                 }
             }
         }
-
-
-        //private List<Request> SelectBestRequestsForElevator(Elevator elevator, List<Request> allRequests, int elevatorIndex)
-        //{
-        //    if (allRequests.Count == 0) return new List<Request>();
-
-        //    // איפוס עבור חישוב חדש
-        //    if (elevatorIndex == 0 || isFirstCall)
-        //    {
-        //        takenRequestIds.Clear();
-        //        isFirstCall = false;
-        //    }
-
-        //    int numElevators = instance.numElevators;
-        //    int requestsPerElevator = Math.Max(1, allRequests.Count / numElevators);
-
-        //    // מסנן בקשות שעדיין זמינות
-        //    var availableRequests = allRequests
-        //        .Where(r => !takenRequestIds.Contains(r.Id))
-        //        .ToList();
-
-        //    if (availableRequests.Count == 0)
-        //    {
-        //        Console.WriteLine($"📊 מעלית {elevatorIndex}: אין בקשות זמינות");
-        //        return new List<Request>();
-        //    }
-
-        //    // דירוג בקשות זמינות לפי התאמה למעלית הזו
-        //    var scoredRequests = availableRequests.Select(request => new
-        //    {
-        //        Request = request,
-        //        Score = CalculateRequestScore(elevator, request, elevatorIndex, numElevators)
-        //    })
-        //    .OrderBy(x => x.Score) // ציון נמוך = יותר טוב
-        //    .ToList();
-
-        //    // בחירת הבקשות הכי טובות עבור המעלית הזו
-        //    var selectedRequests = scoredRequests
-        //        .Take(requestsPerElevator)
-        //        .Select(x => x.Request)
-        //        .ToList();
-
-        //    // סימון הבקשות שנבחרו כתפוסות
-        //    foreach (var request in selectedRequests)
-        //    {
-        //        takenRequestIds.Add(request.Id);
-        //    }
-
-        //    Console.WriteLine($"📊 מעלית {elevatorIndex}: בחרה {selectedRequests.Count} בקשות מתוך {availableRequests.Count} זמינות (נותרו {availableRequests.Count - selectedRequests.Count})");
-
-        //    return selectedRequests;
-        //}
 
         private double CalculateRequestScore(Elevator elevator, Request request, int elevatorIndex, int numElevators)
         {
             double score = 0;
 
-            // 1. מרחק מהבקשה (ככל שקרוב יותר - ציון טוב יותר)
             double distanceScore = Math.Abs(request.StartFloor - elevator.CurrentFloor);
 
-            // 2. התאמה לכיוון הנוכחי של המעלית
             double directionScore = 0;
             if (elevator.CurrentDirection == Direction.Up && request.StartFloor > elevator.CurrentFloor)
-                directionScore = 0; // כיוון מתאים
+                directionScore = 0;
             else if (elevator.CurrentDirection == Direction.Down && request.StartFloor < elevator.CurrentFloor)
-                directionScore = 0; // כיוון מתאים
+                directionScore = 0;
             else if (elevator.CurrentDirection == Direction.Idle)
-                directionScore = 5; // ניטרלי
+                directionScore = 5;
             else
-                directionScore = 20; // כיוון לא מתאים
+                directionScore = 20;
 
-            // 3. התאמה לכיוון הבקשה עצמה
             Direction requestDirection = request.StartFloor < request.DestinationFloor ? Direction.Up : Direction.Down;
             double requestDirectionScore = 0;
             if (elevator.CurrentDirection == requestDirection || elevator.CurrentDirection == Direction.Idle)
@@ -484,10 +377,8 @@ namespace Project.Algorithm
             else
                 requestDirectionScore = 10;
 
-            // 4. חלוקה שווה - עדיפות לפי אינדקס מעלית (עוזר למנוע התנגשויות)
             double distributionScore = (request.Id % numElevators == elevatorIndex) ? 0 : 3;
 
-            // 5. עדיפות לבקשות קצרות (מרחק נסיעה קטן)
             double tripLengthScore = Math.Abs(request.DestinationFloor - request.StartFloor) * 0.1;
 
             score = distanceScore + directionScore + requestDirectionScore + distributionScore + tripLengthScore;
@@ -518,11 +409,10 @@ namespace Project.Algorithm
         {
             Schedule schedule = new Schedule(elevatorIndex);
             float currentTime = 0;
-            int currentFloor = route[0]; // התחל מהקומה הראשונה במסלול
+            int currentFloor = route[0];
 
             foreach (int floor in route)
             {
-                // חישוב זמן נסיעה לקומה
                 float travelTime = (float)CalculateTravelTime(currentFloor, floor);
                 currentTime += travelTime;
 
@@ -530,20 +420,17 @@ namespace Project.Algorithm
                 {
                     Floor = floor,
                     ArrivalTime = currentTime,
-                    Direction = Direction.Idle // נעדכן בהמשך
+                    Direction = Direction.Idle
                 };
 
-                // הוסף כל הבקשות הרלוונטיות לעצירה הזו
                 foreach (var request in requests)
                 {
-                    // איסוף
                     if (request.StartFloor == floor)
                     {
                         stop.AddPickup(request);
                         stop.Direction = request.StartFloor < request.DestinationFloor ? Direction.Up : Direction.Down;
                     }
 
-                    // הורדה
                     if (request.DestinationFloor == floor)
                     {
                         foreach (var call in request.Calls)
@@ -553,7 +440,6 @@ namespace Project.Algorithm
                     }
                 }
 
-                // הוסף את העצירה רק אם יש בה פעילות או זו הקומה הראשונה
                 if (stop.Pickups.Count > 0 || stop.Drops.Count > 0 || floor == route[0])
                 {
                     schedule.AddStop(stop);
@@ -563,7 +449,6 @@ namespace Project.Algorithm
                 currentTime += (float)Constant.StopTime;
             }
 
-            // הוסף כל הבקשות לרשימת הבקשות המטופלות
             foreach (var request in requests)
             {
                 schedule.ServedRequests.Add(request);
@@ -576,8 +461,7 @@ namespace Project.Algorithm
 
         private double CalculateTravelTime(int fromFloor, int toFloor)
         {
-            // השתמש בפונקציה הקיימת שלך או חישוב פשוט
-            return Math.Abs(toFloor - fromFloor) * 2.5; // לדוגמה: 2.5 שניות לקומה
+            return Math.Abs(toFloor - fromFloor) * 2.5;
         }
 
         private float CalculateTotalCost(Schedule schedule)
@@ -589,11 +473,10 @@ namespace Project.Algorithm
             for (int i = 0; i < schedule.Stops.Count - 1; i++)
             {
                 int distance = Math.Abs(schedule.Stops[i + 1].Floor - schedule.Stops[i].Floor);
-                totalCost += distance * 15; // לדוגמה: 15 יחידות עלות לקומה
+                totalCost += distance * 15;
             }
 
-            // הוסף עלות עצירות
-            totalCost += (schedule.Stops.Count - 1) * 10; // 10 יחידות לכל עצירה
+            totalCost += (schedule.Stops.Count - 1) * 10;
 
             return totalCost;
         }
@@ -622,7 +505,6 @@ namespace Project.Algorithm
                     constraint = cplex.AddEq(expr, 0.0);
                 }
 
-                // שמירת המידע על האילוץ
                 BranchingConstraintInfo constraintInfo = new BranchingConstraintInfo(requestIndex, elevatorGroup, assign);
                 constraintInfoMap[constraint] = constraintInfo;
 
@@ -630,7 +512,6 @@ namespace Project.Algorithm
             }
             catch (ILOG.Concert.Exception ex)
             {
-                Console.WriteLine("Error adding branching constraint: " + ex.Message);
                 throw;
             }
         }
@@ -653,7 +534,6 @@ namespace Project.Algorithm
                 }
                 catch (ILOG.Concert.Exception ex)
                 {
-                    Console.WriteLine("Error removing branching constraint: " + ex.Message);
                     throw;
                 }
             }
@@ -677,7 +557,6 @@ namespace Project.Algorithm
             }
             catch (ILOG.Concert.Exception ex)
             {
-                Console.WriteLine("Error solving model: " + ex.Message);
                 throw;
             }
         }
@@ -690,7 +569,6 @@ namespace Project.Algorithm
             }
             catch (ILOG.Concert.Exception ex)
             {
-                Console.WriteLine("Error getting dual prices: " + ex.Message);
                 throw;
             }
         }
@@ -703,7 +581,6 @@ namespace Project.Algorithm
             }
             catch (ILOG.Concert.Exception ex)
             {
-                Console.WriteLine("Error getting dual prices: " + ex.Message);
                 throw;
             }
         }
@@ -726,7 +603,6 @@ namespace Project.Algorithm
             }
             catch (ILOG.Concert.Exception ex)
             {
-                Console.WriteLine("Error ending cplex: " + ex.Message);
             }
         }
     }

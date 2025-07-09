@@ -6,7 +6,6 @@ using System.Threading.Tasks;
 using static System.Runtime.InteropServices.JavaScript.JSType;
 using Project;
 
-
 namespace Project.Algorithm
 {
     public class ProblemInstance
@@ -17,9 +16,9 @@ namespace Project.Algorithm
         private double loadTime { get; set; }
         private double drivePerFloorTime { get; set; }
         public double capacityPenalty { get; set; } = 1000;
-        //public double capacityPenalty { get; set; }
         private List<Elevator> elevators { get; set; } = new List<Elevator>();
         private List<Request> unassignedRequests { get; set; } = new List<Request>();
+
         public ProblemInstance(int numElevators, int numFloors, double stopTime, double loadTime,
                           double drivePerFloorTime, double capacityPenalty = 1000)
         {
@@ -35,22 +34,27 @@ namespace Project.Algorithm
         {
             elevators.Add(elevator);
         }
+
         public void AddRequest(Request request)
         {
             unassignedRequests.Add(request);
         }
-        public List<Request> GetUnassignedRequests()//??לבדוק אם אני לא צריכה להחזיר את הרשימה האמיתית כי צריך לשנות
+
+        public List<Request> GetUnassignedRequests()
         {
             return new List<Request>(unassignedRequests);
         }
+
         public double GetstopTime()
         {
-            return stopTime;//??
+            return stopTime;
         }
-        public List<Elevator> GetElevators()//??לבדוק אם אני לא צריכה להחזיר את הרשימה האמיתית כי צריך לשנות
+
+        public List<Elevator> GetElevators()
         {
             return new List<Elevator>(elevators);
         }
+
         public void RemoveRequest(Request request)
         {
             unassignedRequests.Remove(request);
@@ -72,6 +76,5 @@ namespace Project.Algorithm
             }
             throw new IndexOutOfRangeException($"Index {index} is out of range for unassigned requests");
         }
-
     }
 }

@@ -15,7 +15,6 @@ namespace Project
         public float CapacityPenaltyCost { get; set; }
         public List<Request> ServedRequests { get; set; } = new List<Request>();
 
-        // Basic constructor
         public Schedule(int elevatorIndex)
         {
             ElevatorIndex = elevatorIndex;
@@ -24,19 +23,16 @@ namespace Project
         }
 
 
-        // Copy constructor - creates a deep copy
         public Schedule(Schedule source)
         {
             if (source == null)
                 throw new ArgumentNullException(nameof(source));
 
-            // Copy simple properties
             Id = source.Id;
             ElevatorIndex = source.ElevatorIndex;
             TotalCost = source.TotalCost;
             CapacityPenaltyCost = source.CapacityPenaltyCost;
 
-            // Deep copy of Stops
             Stops = source.Stops.Select(stop => new Stop
             {
                 Floor = stop.Floor,
@@ -44,7 +40,6 @@ namespace Project
                 DropFloors = new HashSet<int>(stop.DropFloors)
             }).ToList();
 
-            // Deep copy of ServedRequests (assuming Request is immutable or has its own copy mechanism)
             ServedRequests = new List<Request>(source.ServedRequests);
         }
 
@@ -77,12 +72,10 @@ namespace Project
         }
         private Schedule ConvertScheduleFromColumn(Column column)
         {
-            // המרת עמודה לסקדיול
             Schedule schedule = new Schedule(column.AssignedElevator.Id);
             schedule.ServedRequests = new List<Request>(column.ServedRequests);
             schedule.TotalCost = (float)column.Cost;
 
-            // יצירת עצירות לפי רשימת הקומות
             int currentFloor = column.AssignedElevator.CurrentFloor;
             float currentTime = 0;
 
@@ -90,14 +83,12 @@ namespace Project
             {
                 int floor = column.Floors[i];
 
-                // חישוב זמן נסיעה
                 if (i > 0)
                 {
                     float travelTime = (float)Constant.CalculateTravelTime(currentFloor, floor);
                     currentTime += travelTime;
                 }
 
-                // יצירת עצירה
                 Direction direction = Direction.Idle;
                 if (i < column.Floors.Count - 1)
                 {
@@ -112,7 +103,6 @@ namespace Project
                     Direction = direction
                 };
 
-                // הוספת מידע על איסוף והורדה
                 foreach (var request in column.ServedRequests)
                 {
                     if (floor == request.StartFloor)
@@ -130,10 +120,8 @@ namespace Project
 
                 schedule.AddStop(stop);
 
-                // עדכון קומה נוכחית וזמן
                 currentFloor = floor;
 
-                // אם יש עצירה (איסוף או הורדה), הוסף זמן עצירה
                 if (stop.Pickups.Count > 0 || stop.Drops.Count > 0)
                 {
                     currentTime += (float)Project.Constant.StopTime;

@@ -1,6 +1,6 @@
 ﻿using System; // נחוץ עבור DateTime
 
-namespace Project.DTO // <<<< שינוי כאן ל-Project.DTO
+namespace Project.DTO 
 {
     public class ElevatorRequestInput
     {

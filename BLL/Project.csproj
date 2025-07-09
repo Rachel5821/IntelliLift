@@ -7,6 +7,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Remove="Algorithm\BranchAndPrice.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Reference Include="ILOG.Concert">
       <HintPath>..\..\..\..\..\..\Program Files\IBM\ILOG\CPLEX_Studio_Community2212\cplex\bin\x64_win64\ILOG.Concert.dll</HintPath>
     </Reference>

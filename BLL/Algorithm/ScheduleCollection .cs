@@ -37,7 +37,7 @@ namespace Project.Algorithm
             return schedules[index];
         }
 
-        public List<Schedule> GetAllSchedules()//??לבדוק אם אני לא צריכה באמת להחזיר אמיתי ולא עותק 
+        public List<Schedule> GetAllSchedules()
         {
             return new List<Schedule>(schedules);
         }

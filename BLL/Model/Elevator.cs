@@ -18,12 +18,11 @@ namespace Project
         public int Capacity { get; set; }
         public int CurrentFloor { get; set; }
         public Direction CurrentDirection { get; set; }
-        // רשימת הקריאות הטעונות במעלית
         public List<Call> LoadedCalls { get; set; } = new List<Call>();
-        public HashSet<Direction> FeasibleDirections { get; set; }//כיוונים אפשריים
+        public HashSet<Direction> FeasibleDirections { get; set; }
         public HashSet<int> DropCommitments { get; set; } = new HashSet<int>();
         public float CurrentTime { get; set; }
-        public List<Request> AssignedRequests { get; set; } = new List<Request>(); // R(e) במאמר
+        public List<Request> AssignedRequests { get; set; } = new List<Request>();
 
     }
 }

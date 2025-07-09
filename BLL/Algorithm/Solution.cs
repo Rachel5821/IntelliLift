@@ -12,11 +12,10 @@ namespace Project.Algorithm
         private double[] values;
 
         private ScheduleCollection schedules;
-        public double ObjectiveValue { get; private set; }//ערך פונקציית המטרה
+        public double ObjectiveValue { get; private set; }
         private double[] requestDuals;
         private double[] elevatorDuals;
         public bool isIntegral { get; private set; }
-        // שיפור הבנאי לכלול בדיקות תקינות ולבצע העתקה עמוקה של המערכים
         public Solution(double[] values, ScheduleCollection schedules, double objectiveValue, double[] requestDuals = null, double[] elevatorDuals = null)
         {
             if (values == null)
@@ -25,7 +24,7 @@ namespace Project.Algorithm
                 throw new ArgumentNullException(nameof(schedules));
 
             this.values = (double[])values.Clone();
-            this.schedules = schedules; // בהנחה שהרשימה לא תשתנה מחוץ למחלקה
+            this.schedules = schedules; 
             ObjectiveValue = objectiveValue;
 
             if (requestDuals != null)

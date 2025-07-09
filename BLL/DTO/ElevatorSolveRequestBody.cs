@@ -1,6 +1,6 @@
-﻿using System.Collections.Generic; // נחוץ עבור List<>
+﻿using System.Collections.Generic; 
 
-namespace Project.DTO // <<<< שינוי כאן ל-Project.DTO
+namespace Project.DTO 
 {
     public class ElevatorSolveRequestBody
     {

@@ -9,7 +9,6 @@ namespace Project
         public DateTime ReleaseTime { get; set; }
         public int StartFloor { get; set; }
         public int DestinationFloor { get; set; }
-        // שיטה סטטית למעקב אחר ID הבא
         private static int nextRequestId = 1;
 
         public Request()
